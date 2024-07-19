@@ -1,0 +1,25 @@
+resolver = "2"
+
+[workspace]
+members = [
+  "derive",
+  "parser",
+  "examples"
+]
+
+[workspace.dependencies]
+regex = "1.5.5"
+as_bool = "0.1.3"
+
+[package]
+name = "rusty-handlebars"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+as_bool.workspace = true
+rusty-handlebars-derive = { path = "derive" }
+rusty-handlebars-parser = { path = "parser", optional = true }
+
+[features]
+parser = ["dep:rusty-handlebars-parser"]
