@@ -87,7 +87,7 @@ impl Parse for DisplayParts{
     }
 }
 
-#[proc_macro_derive(ToHtml, attributes(Template))]
+#[proc_macro_derive(DisplayAsHtml, attributes(Template))]
 pub fn make_renderable(raw: TokenStream) -> TokenStream{
     let DisplayParts{
         name, lifetimes, content
@@ -100,7 +100,7 @@ pub fn make_renderable(raw: TokenStream) -> TokenStream{
         Some(content) => quote! {
             mod #mod_name{
                 use std::fmt::Display;
-                use rusty_handlebars::{ToHtml, AsBool, html_escape};
+                use rusty_handlebars::{DisplayAsHtml, AsBool, as_text, as_html};
                 use super::#name;
                 impl #lifetimes Display for #name #lifetimes {
                     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -108,20 +108,20 @@ pub fn make_renderable(raw: TokenStream) -> TokenStream{
                         Ok(())
                     }
                 }
-                impl #lifetimes ToHtml for #name #lifetimes {}
+                impl #lifetimes DisplayAsHtml for #name #lifetimes {}
             }
         },
         None => quote! {
             mod #mod_name{
                 use std::fmt::Display;
-                use rusty_handlebars::ToHtml;
+                use rusty_handlebars::DisplayAsHtml;
                 use super::#name;
-                impl #lifetimes std::fmt::Display for #name #lifetimes {
+                impl #lifetimes Display for #name #lifetimes {
                     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                         Ok(())
                     }
                 }
-                impl #lifetimes ToHtml for #name #lifetimes {}
+                impl #lifetimes DisplayAsHtml for #name #lifetimes {}
             }
         }
     })

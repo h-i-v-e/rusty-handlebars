@@ -1,14 +1,20 @@
-use rusty_handlebars::ToHtml;
+use rusty_handlebars::DisplayAsHtml;
 
-#[derive(ToHtml)]
+#[derive(DisplayAsHtml)]
 #[Template(path="examples/templates/very-simple.hbs")]
 struct Simple{}
 
-#[derive(ToHtml)]
+#[derive(DisplayAsHtml)]
 #[Template(path="examples/templates/more-involved.hbs")]
 struct MoreInvolved<'a>{
     name: &'a str,
     age: u8
+}
+
+#[derive(DisplayAsHtml)]
+#[Template(path="examples/templates/with-options.hbs")]
+struct WithOptions<'a>{
+    options: &'a [Option<&'a str>]
 }
 
 fn main(){
@@ -20,5 +26,12 @@ fn main(){
     println!("{}", MoreInvolved{
         name: "Boo Boo",
         age: 0
+    });
+    println!("{}", WithOptions{
+        options: &[
+            Some("one"),
+            None,
+            Some("three")
+        ]
     });
 }

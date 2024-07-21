@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>With Options</title>
+    </head>
+    <body>
+        <h1>With Options</h1>
+        {{~#each options as option~}}
+            {{~#if option~}}
+                <p>{{{option}}}</p>
+            {{~else~}}
+                <p>Nothing here</p>
+            {{~/if~}}
+        {{/each~}}
+    </body>
+</html>

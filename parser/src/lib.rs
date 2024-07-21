@@ -416,8 +416,8 @@ impl Compiler {
             suffix = expr.postfix;
             self.write_str(&mut compile, expr.preffix);
             match expr.expression_type{
-                ExpressionType::Raw => compile.resolve(expr.content, "Display::fmt(&(", "),f)?;"),
-                ExpressionType::HtmlEscaped => compile.resolve(expr.content, "html_escape(&(", "), f)?;"),
+                ExpressionType::Raw => compile.resolve(expr.content, "as_text(&(", "),f)?;"),
+                ExpressionType::HtmlEscaped => compile.resolve(expr.content, "as_html(&(", "), f)?;"),
                 ExpressionType::Open => compile.open(expr.content)?,
                 ExpressionType::Close => compile.close(expr.content.trim())?,
                 ExpressionType::Escaped => self.write_str(&mut compile, expr.content),
@@ -439,7 +439,7 @@ mod tests {
         let compiler = Compiler::new();
         let src = "Hello {{{name}}}!";
         let rust = compiler.compile(src).unwrap();
-        assert_eq!(rust, "f.write_str(\"Hello \")?;Display::fmt(&(self.name),f)?;f.write_str(\"!\")?;");
+        assert_eq!(rust, "f.write_str(\"Hello \")?;as_text(&(self.name),f)?;f.write_str(\"!\")?;");
     }
 
     #[test]
@@ -463,25 +463,25 @@ mod tests {
     #[test]
     fn test_each(){
         let rust = Compiler::new().compile("{{#each some}}Hello {{this}}{{/each}}").unwrap();
-        assert_eq!(rust, "for this in self.some{f.write_str(\"Hello \")?;html_escape(&(this), f)?;}");
+        assert_eq!(rust, "for this in self.some{f.write_str(\"Hello \")?;as_html(&(this), f)?;}");
     }
 
     #[test]
     fn test_with(){
         let rust = Compiler::new().compile("{{#with some}}Hello {{name}}{{/with}}").unwrap();
-        assert_eq!(rust, "f.write_str(\"Hello \")?;html_escape(&(self.some.name), f)?;");
+        assert_eq!(rust, "f.write_str(\"Hello \")?;as_html(&(self.some.name), f)?;");
     }
 
     #[test]
     fn test_nesting(){
         let rust = Compiler::new().compile("{{#if some}}{{#each some}}Hello {{this}}{{/each}}{{/if}}").unwrap();
-        assert_eq!(rust, "if self.some.as_bool(){for this in self.some{f.write_str(\"Hello \")?;html_escape(&(this), f)?;}}");
+        assert_eq!(rust, "if self.some.as_bool(){for this in self.some{f.write_str(\"Hello \")?;as_html(&(this), f)?;}}");
     }
 
     #[test]
     fn test_as(){
         let rust = Compiler::new().compile("{{#if some}}{{#each some as thing}}Hello {{thing}}{{/each}}{{/if}}").unwrap();
-        assert_eq!(rust, "if self.some.as_bool(){for thing in self.some{f.write_str(\"Hello \")?;html_escape(&(thing), f)?;}}");
+        assert_eq!(rust, "if self.some.as_bool(){for thing in self.some{f.write_str(\"Hello \")?;as_html(&(thing), f)?;}}");
     }
 
     #[test]
@@ -493,7 +493,7 @@ mod tests {
     #[test]
     fn test_scoping(){
         let rust = Compiler::new().compile("{{#with some}}{{#with other}}Hello {{name}} {{../company}} {{/with}}{{/with}}").unwrap();
-        assert_eq!(rust, "f.write_str(\"Hello \")?;html_escape(&(self.some.other.name), f)?;f.write_str(\" \")?;html_escape(&(self.some.company), f)?;f.write_str(\" \")?;");
+        assert_eq!(rust, "f.write_str(\"Hello \")?;as_html(&(self.some.other.name), f)?;f.write_str(\" \")?;as_html(&(self.some.company), f)?;f.write_str(\" \")?;");
     }
 
     #[test]
