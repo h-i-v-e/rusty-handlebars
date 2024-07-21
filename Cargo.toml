@@ -13,13 +13,13 @@ as_bool = "0.1.3"
 
 [package]
 name = "rusty-handlebars"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [dependencies]
 as_bool.workspace = true
-rusty-handlebars-derive = { path = "derive" }
-rusty-handlebars-parser = { path = "parser", optional = true }
+rusty-handlebars-derive = { path = "derive", version = "0.1.1"}
+rusty-handlebars-parser = { path = "parser", version = "0.1.1", optional = true }
 
 [features]
 parser = ["dep:rusty-handlebars-parser"]
