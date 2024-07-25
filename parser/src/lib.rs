@@ -213,10 +213,7 @@ impl<'a> Compile<'a>{
                 parent: None,
                 opened: OpenType::Root,
                 this,
-                local: /*match this {
-                    Some(this) => Local::As(this),
-                    None => Local::None
-                }*/Local::None,
+                local: Local::None,
                 indexer: None
             }]
         }
@@ -599,31 +596,40 @@ impl Compiler {
         if content.is_empty(){
             return;
         }
-        rust.push_str("f.write_str(\"");
+        rust.push_str("write!(f, \"");
         rust.push_str(self.escape(content).as_ref());
         rust.push_str("\")?;");
+    }
+
+    fn write_resolve(&self, compile: &mut Compile, rust: &mut String, content: &str, display: &str) -> Result<()> {
+        compile.resolve(rust, content, "write!(f, \"{}\", ", display)
     }
 
     pub fn compile(&self, this: Option<&str>, src: &str) -> Result<String>{
         let mut compile = Compile::new(this);
         let mut rust = String::new();
-        let mut postfix = src;
+        let mut rest = src;
         let mut expression = Expression::from(src)?;
         while let Some(expr) = expression{
-            postfix = expr.postfix;
-            let prefix = expr.prefix;
+            let Expression{
+                expression_type,
+                prefix,
+                content,
+                postfix
+            } = &expr;
+            rest = postfix;
             self.write_str(&mut rust, prefix);
-            match expr.expression_type{
-                ExpressionType::Raw => compile.resolve(&mut rust, expr.content, "as_text(&(", "),f)?;")?,
-                ExpressionType::HtmlEscaped => compile.resolve(&mut rust, expr.content, "as_html(&(", "), f)?;")?,
-                ExpressionType::Open => compile.open(&mut rust, prefix, expr.content, postfix)?,
+            match expression_type{
+                ExpressionType::Raw => self.write_resolve(&mut compile, &mut rust, content, ".as_display())?;")?,
+                ExpressionType::HtmlEscaped => self.write_resolve(&mut compile, &mut rust, content, ".as_display_html())?;")?,
+                ExpressionType::Open => compile.open(&mut rust, prefix, content, postfix)?,
                 ExpressionType::Close => compile.close(&mut rust, expr.content.trim())?,
-                ExpressionType::Escaped => self.write_str(&mut rust, expr.content),
+                ExpressionType::Escaped => self.write_str(&mut rust, content),
                 _ => ()
             };
             expression = expr.next()?;
         }
-        self.write_str(&mut rust, postfix);
+        self.write_str(&mut rust, rest);
         Ok(rust)
     }
 }
@@ -640,85 +646,85 @@ mod tests {
     fn it_works() {
         assert_eq!(
             compile("Hello {{{name}}}!"),
-            "f.write_str(\"Hello \")?;as_text(&(self.name),f)?;f.write_str(\"!\")?;"
+            "write!(f, \"Hello \")?;write!(f, \"{}\", self.name.as_display())?;write!(f, \"!\")?;"
         );
     }
 
     #[test]
     fn test_if(){
         let rust = compile("{{#if some}}Hello{{/if}}");
-        assert_eq!(rust, "if self.some.as_bool(){f.write_str(\"Hello\")?;}");
+        assert_eq!(rust, "if self.some.as_bool(){write!(f, \"Hello\")?;}");
     }
 
     #[test]
     fn test_else(){
         let rust = compile("{{#if some}}Hello{{else}}World{{/if}}");
-        assert_eq!(rust, "if self.some.as_bool(){f.write_str(\"Hello\")?;}else{f.write_str(\"World\")?;}");
+        assert_eq!(rust, "if self.some.as_bool(){write!(f, \"Hello\")?;}else{write!(f, \"World\")?;}");
     }
 
     #[test]
     fn test_unless(){
         let rust = compile("{{#unless some}}Hello{{/unless}}");
-        assert_eq!(rust, "if !self.some.as_bool(){f.write_str(\"Hello\")?;}");
+        assert_eq!(rust, "if !self.some.as_bool(){write!(f, \"Hello\")?;}");
     }
 
     #[test]
     fn test_each(){
         let rust = compile("{{#each some}}Hello {{this}}{{/each}}");
-        assert_eq!(rust, "for this_1 in self.some{f.write_str(\"Hello \")?;as_html(&(this_1), f)?;}");
+        assert_eq!(rust, "for this_1 in self.some{write!(f, \"Hello \")?;write!(f, \"{}\", this_1.as_display_html())?;}");
     }
 
     #[test]
     fn test_with(){
         let rust = compile("{{#with some}}Hello {{name}}{{/with}}");
-        assert_eq!(rust, "{let this_1 = self.some;f.write_str(\"Hello \")?;as_html(&(this_1.name), f)?;}");
+        assert_eq!(rust, "{let this_1 = self.some;write!(f, \"Hello \")?;write!(f, \"{}\", this_1.name.as_display_html())?;}");
     }
 
     #[test]
     fn test_nesting(){
         let rust = compile("{{#if some}}{{#each some}}Hello {{this}}{{/each}}{{/if}}");
-        assert_eq!(rust, "if self.some.as_bool(){for this_2 in self.some{f.write_str(\"Hello \")?;as_html(&(this_2), f)?;}}");
+        assert_eq!(rust, "if self.some.as_bool(){for this_2 in self.some{write!(f, \"Hello \")?;write!(f, \"{}\", this_2.as_display_html())?;}}");
     }
 
     #[test]
     fn test_as(){
         let rust = compile("{{#if some}}{{#each some as thing}}Hello {{thing}} {{thing.name}}{{/each}}{{/if}}");
-        assert_eq!(rust, "if self.some.as_bool(){for thing_2 in self.some{f.write_str(\"Hello \")?;as_html(&(thing_2), f)?;f.write_str(\" \")?;as_html(&(thing_2.name), f)?;}}");
+        assert_eq!(rust, "if self.some.as_bool(){for thing_2 in self.some{write!(f, \"Hello \")?;write!(f, \"{}\", thing_2.as_display_html())?;write!(f, \" \")?;write!(f, \"{}\", thing_2.name.as_display_html())?;}}");
     }
 
     #[test]
     fn test_comment(){
         let rust = compile("Note: {{! This is a comment }} and {{!-- {{so is this}} --}}\\{{{{}}");
-        assert_eq!(rust, "f.write_str(\"Note: \")?;f.write_str(\" and \")?;f.write_str(\"{{\")?;");
+        assert_eq!(rust, "write!(f, \"Note: \")?;write!(f, \" and \")?;write!(f, \"{{\")?;");
     }
 
     #[test]
     fn test_scoping(){
         let rust = compile("{{#with some}}{{#with other}}Hello {{name}} {{../company}} {{/with}}{{/with}}");
-        assert_eq!(rust, "{let this_1 = self.some;{let this_2 = this_1.other;f.write_str(\"Hello \")?;as_html(&(this_2.name), f)?;f.write_str(\" \")?;as_html(&(this_1.company), f)?;f.write_str(\" \")?;}}");
+        assert_eq!(rust, "{let this_1 = self.some;{let this_2 = this_1.other;write!(f, \"Hello \")?;write!(f, \"{}\", this_2.name.as_display_html())?;write!(f, \" \")?;write!(f, \"{}\", this_1.company.as_display_html())?;write!(f, \" \")?;}}");
     }
 
     #[test]
     fn test_trimming(){
         let rust = compile("  {{~#if some ~}}   Hello{{~/if~}}");
-        assert_eq!(rust, "if self.some.as_bool(){f.write_str(\"Hello\")?;}");
+        assert_eq!(rust, "if self.some.as_bool(){write!(f, \"Hello\")?;}");
     }
 
     #[test]
     fn test_indexer(){
         let rust = compile("{{#each things}}Hello{{{@index}}}{{#each things}}{{{lookup other @../index}}}{{{@index}}}{{/each}}{{/each}}");
-        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{f.write_str(\"Hello\")?;as_text(&(i_1),f)?;let mut i_2 = 0;for this_2 in this_1.things{as_text(&(this_2.other[i_1]),f)?;as_text(&(i_2),f)?;i_2 += 1;}i_1 += 1;}");
+        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{write!(f, \"Hello\")?;write!(f, \"{}\", i_1.as_display())?;let mut i_2 = 0;for this_2 in this_1.things{write!(f, \"{}\", this_2.other[i_1].as_display())?;write!(f, \"{}\", i_2.as_display())?;i_2 += 1;}i_1 += 1;}");
     }
 
     #[test]
     fn test_subexpression(){
         let rust = compile("{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}");
-        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{{let other_2 = (self.other[i_1]);as_text(&(this_1.name),f)?;f.write_str(\": \")?;as_text(&(other_2),f)?;}i_1 += 1;}");
+        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{{let other_2 = (self.other[i_1]);write!(f, \"{}\", this_1.name.as_display())?;write!(f, \": \")?;write!(f, \"{}\", other_2.as_display())?;}i_1 += 1;}");
     }
 
     #[test]
     fn test_selfless(){
         let rust = Compiler::new().compile(None, "{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}").unwrap();
-        assert_eq!(rust, "let mut i_1 = 0;for this_1 in things{{let other_2 = (other[i_1]);as_text(&(this_1.name),f)?;f.write_str(\": \")?;as_text(&(other_2),f)?;}i_1 += 1;}");
+        assert_eq!(rust, "let mut i_1 = 0;for this_1 in things{{let other_2 = (other[i_1]);write!(f, \"{}\", this_1.name.as_display())?;write!(f, \": \")?;write!(f, \"{}\", other_2.as_display())?;}i_1 += 1;}");
     }
 }

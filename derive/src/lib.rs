@@ -130,7 +130,7 @@ pub fn make_renderable(raw: TokenStream) -> TokenStream{
         Some(content) => quote! {
             mod #mod_name{
                 use std::fmt::Display;
-                use rusty_handlebars::{DisplayAsHtml, AsDisplay, AsDisplayHtml, AsBool, as_text, as_html};
+                use rusty_handlebars::{DisplayAsHtml, AsDisplay, AsDisplayHtml, AsBool};
                 use super::#name;
                 impl #generics Display for #name #cleaned_generics {
                     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

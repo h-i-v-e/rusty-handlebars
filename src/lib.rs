@@ -167,11 +167,3 @@ impl<T: AsDisplayHtml> AsDisplayHtml for &Box<T>{
         self.as_ref().as_display_html()
     }
 }
-
-pub fn as_text<T: AsDisplay>(item: &T, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    item.as_display().fmt(f)
-}
-
-pub fn as_html<T: AsDisplayHtml>(item: &T, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    item.as_display_html().fmt(f)
-}

@@ -17,7 +17,6 @@ struct ChecklistResponseSave{
     responses: Vec<bool>
 }
 
-
 #[derive(DisplayAsHtml)]
 #[Template(path="examples/templates/email.hbs")]
 struct ChecklistEmail<'a, 'b, 'c>{
@@ -28,8 +27,6 @@ struct ChecklistEmail<'a, 'b, 'c>{
     response: &'a ChecklistResponseSave,
     link: &'a str
 }
-
-
 
 #[derive(DisplayAsHtml)]
 #[Template(path="examples/templates/very-simple.hbs")]
@@ -73,6 +70,7 @@ struct Wrapper<'a>{
 }
 
 fn main(){
+    
     println!("{}", ChecklistEmail{
         asset_title: "Asset 1234",
         address: "1234 Main St",
