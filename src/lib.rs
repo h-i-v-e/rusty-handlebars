@@ -15,6 +15,12 @@ macro_rules! impl_as_display {
                     self
                 }
             }
+
+            impl AsDisplay for &$t{
+                fn as_display(&self) -> impl Display {
+                    self
+                }
+            }
         )*
     }
 }
@@ -23,6 +29,12 @@ macro_rules! impl_as_display_html {
     ($($t:ty),*) => {
         $(
             impl AsDisplayHtml for $t{
+                fn as_display_html(&self) -> impl Display {
+                    self
+                }
+            }
+
+            impl AsDisplayHtml for &$t{
                 fn as_display_html(&self) -> impl Display {
                     self
                 }
@@ -61,9 +73,15 @@ impl<T: AsDisplay> AsDisplay for &Option<T>{
     }
 }
 
-impl <T: DisplayAsHtml> AsDisplay for T{
+impl<T: AsDisplay> AsDisplay for Box<T>{
     fn as_display(&self) -> impl Display {
-        self
+        self.as_ref().as_display()
+    }
+}
+
+impl<T: AsDisplay> AsDisplay for &Box<T>{
+    fn as_display(&self) -> impl Display {
+        self.as_ref().as_display()
     }
 }
 
@@ -92,21 +110,27 @@ impl AsDisplayHtml for &str{
     }
 }
 
-struct DisplayAsHtmlAsDisplayHtml<'a, T: DisplayAsHtml>{
-    item: &'a T
+impl AsDisplayHtml for &&str{
+    fn as_display_html(&self) -> impl Display {
+        DisplayHtml{string: *self}
+    }
 }
 
-impl<'a, T: DisplayAsHtml> Display for DisplayAsHtmlAsDisplayHtml<'a, T>{
+/*struct DisplayAsHtmlAsDisplayHtml<'a, T: DisplayAsHtml>{
+    item: &'a T
+}*/
+
+/*impl<'a, T: DisplayAsHtml> Display for DisplayAsHtmlAsDisplayHtml<'a, T>{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.item.to_string().as_display_html().fmt(f)
     }
-}
+}*/
 
-impl <T: DisplayAsHtml> AsDisplayHtml for T{
+/*impl <T: DisplayAsHtml> AsDisplayHtml for T{
     fn as_display_html(&self) -> impl Display {
         DisplayAsHtmlAsDisplayHtml{item: self}
     }
-}
+}*/
 
 impl AsDisplayHtml for String{
     fn as_display_html(&self) -> impl Display {
@@ -129,6 +153,18 @@ impl<T: AsDisplayHtml> AsDisplayHtml for &Option<T>{
             Some(t) => t.as_display_html().to_string(),
             None => "".as_display_html().to_string()
         }
+    }
+}
+
+impl<T: AsDisplayHtml> AsDisplayHtml for Box<T>{
+    fn as_display_html(&self) -> impl Display {
+        self.as_ref().as_display_html()
+    }
+}
+
+impl<T: AsDisplayHtml> AsDisplayHtml for &Box<T>{
+    fn as_display_html(&self) -> impl Display {
+        self.as_ref().as_display_html()
     }
 }
 

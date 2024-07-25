@@ -1,0 +1,12 @@
+<h2>With Lookups</h2>
+{{#each names as |name|~}}
+    {{#with (lookup is_planet @index) as |is_planet|~}}
+        <p>{{../name}}
+        {{#if is_planet~}}
+            is a planet
+        {{~else~}}
+            is not a planet
+        {{~/if~}}
+        </p>
+    {{~/with}}
+{{~/each}}

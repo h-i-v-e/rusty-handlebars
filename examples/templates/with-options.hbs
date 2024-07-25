@@ -1,16 +1,9 @@
-<!DOCTYPE html>
-<html>
-    <head>
-        <title>With Options</title>
-    </head>
-    <body>
-        <h1>With Options</h1>
-        {{~#each options as option~}}
-            {{~#if option~}}
-                <p>{{{option}}}</p>
-            {{~else~}}
-                <p>Nothing here</p>
-            {{~/if~}}
-        {{/each~}}
-    </body>
-</html>
+<h2>With Options</h2>
+<ul>{{~#each options as option~}}
+    <li>{{{@index}}}:
+    {{~#if option~}}
+        {{option}}
+    {{~else~}}
+        Nothing here
+    {{~/if~}}</li>
+{{~/each~}}</ul>
