@@ -206,24 +206,27 @@ fn append_with_depth(depth: usize, var: &str, buffer: &mut String){
 }
 
 impl<'a> Compile<'a>{
-    fn new() -> Self{
+    fn new(this: Option<&'a str>) -> Self{
         Self{
             open_stack: vec![Scope{
                 depth: 0,
                 parent: None,
                 opened: OpenType::Root,
-                this: Some("self"),
-                local: Local::As("self"),
+                this,
+                local: /*match this {
+                    Some(this) => Local::As(this),
+                    None => Local::None
+                }*/Local::None,
                 indexer: None
             }]
         }
     }
 
-    fn debug_stack(&self){
+    /*fn debug_stack(&self){
         for scope in self.open_stack.iter(){
             println!("{:?}", scope);
         }
-    }
+    }*/
 
     fn push_scope_with_local(&mut self, opened: OpenType, local: Local<'a>){
         let depth = self.open_stack.len();
@@ -279,7 +282,10 @@ impl<'a> Compile<'a>{
 
     fn resolve_var(&self, var: &'a str, scope: &Scope<'a>, buffer: &mut String) -> Result<()>{
         if scope.depth == 0{
-            buffer.push_str("self.");
+            if let Some(this) = scope.this{
+                buffer.push_str(this);
+                buffer.push('.');
+            }
             buffer.push_str(var);
             return Ok(());
         }
@@ -320,20 +326,27 @@ impl<'a> Compile<'a>{
             return self.resolve(rust, var.value, "(", ")");
         }
         let var = var.value;
-        if var.starts_with('@'){
-            let (label, scope) = self.find_scope(&var[1..])?;
-            self.debug_stack();
-            match label{
-                "index" => match &scope.indexer{
-                    Some(indexer) => Ok(rust.push_str(indexer.as_str())),
-                    _ => Err(ParseError::new(format!("{} not in scope", var)))
-                },
-                _ => Err(ParseError::new(format!("{} not implimented", var)))
+        let starts_with = &var[..1];
+        match starts_with{
+            "&" | "*" => {
+                rust.push_str(starts_with);
+                let (var, scope) = self.find_scope(&var[1..])?;
+                Ok(self.resolve_var(var, scope, rust)?)
+            },
+            "@" => {
+                let (label, scope) = self.find_scope(&var[1..])?;
+                match label{
+                    "index" => match &scope.indexer{
+                        Some(indexer) => Ok(rust.push_str(indexer.as_str())),
+                        _ => Err(ParseError::new(format!("{} not in scope", var)))
+                    },
+                    _ => Err(ParseError::new(format!("{} not implimented", var)))
+                }
+            },
+            _ => {
+                let (var, scope) = self.find_scope(var)?;
+                Ok(self.resolve_var(var, scope, rust)?)
             }
-        }
-        else{
-            let (var, scope) = self.find_scope(var)?;
-            Ok(self.resolve_var(var, scope, rust)?)
         }
     }
 
@@ -591,8 +604,8 @@ impl Compiler {
         rust.push_str("\")?;");
     }
 
-    pub fn compile(&self, src: &str) -> Result<String>{
-        let mut compile = Compile::new();
+    pub fn compile(&self, this: Option<&str>, src: &str) -> Result<String>{
+        let mut compile = Compile::new(this);
         let mut rust = String::new();
         let mut postfix = src;
         let mut expression = Expression::from(src)?;
@@ -619,83 +632,93 @@ impl Compiler {
 mod tests {
     use crate::*;
 
+    fn compile(src: &str) -> String{
+        Compiler::new().compile(Some("self"), src).unwrap()
+    }
+
     #[test]
     fn it_works() {
-        let compiler = Compiler::new();
-        let src = "Hello {{{name}}}!";
-        let rust = compiler.compile(src).unwrap();
-        assert_eq!(rust, "f.write_str(\"Hello \")?;as_text(&(self.name),f)?;f.write_str(\"!\")?;");
+        assert_eq!(
+            compile("Hello {{{name}}}!"),
+            "f.write_str(\"Hello \")?;as_text(&(self.name),f)?;f.write_str(\"!\")?;"
+        );
     }
 
     #[test]
     fn test_if(){
-        let rust = Compiler::new().compile("{{#if some}}Hello{{/if}}").unwrap();
+        let rust = compile("{{#if some}}Hello{{/if}}");
         assert_eq!(rust, "if self.some.as_bool(){f.write_str(\"Hello\")?;}");
     }
 
     #[test]
     fn test_else(){
-        let rust = Compiler::new().compile("{{#if some}}Hello{{else}}World{{/if}}").unwrap();
+        let rust = compile("{{#if some}}Hello{{else}}World{{/if}}");
         assert_eq!(rust, "if self.some.as_bool(){f.write_str(\"Hello\")?;}else{f.write_str(\"World\")?;}");
     }
 
     #[test]
     fn test_unless(){
-        let rust = Compiler::new().compile("{{#unless some}}Hello{{/unless}}").unwrap();
+        let rust = compile("{{#unless some}}Hello{{/unless}}");
         assert_eq!(rust, "if !self.some.as_bool(){f.write_str(\"Hello\")?;}");
     }
 
     #[test]
     fn test_each(){
-        let rust = Compiler::new().compile("{{#each some}}Hello {{this}}{{/each}}").unwrap();
+        let rust = compile("{{#each some}}Hello {{this}}{{/each}}");
         assert_eq!(rust, "for this_1 in self.some{f.write_str(\"Hello \")?;as_html(&(this_1), f)?;}");
     }
 
     #[test]
     fn test_with(){
-        let rust = Compiler::new().compile("{{#with some}}Hello {{name}}{{/with}}").unwrap();
+        let rust = compile("{{#with some}}Hello {{name}}{{/with}}");
         assert_eq!(rust, "{let this_1 = self.some;f.write_str(\"Hello \")?;as_html(&(this_1.name), f)?;}");
     }
 
     #[test]
     fn test_nesting(){
-        let rust = Compiler::new().compile("{{#if some}}{{#each some}}Hello {{this}}{{/each}}{{/if}}").unwrap();
+        let rust = compile("{{#if some}}{{#each some}}Hello {{this}}{{/each}}{{/if}}");
         assert_eq!(rust, "if self.some.as_bool(){for this_2 in self.some{f.write_str(\"Hello \")?;as_html(&(this_2), f)?;}}");
     }
 
     #[test]
     fn test_as(){
-        let rust = Compiler::new().compile("{{#if some}}{{#each some as thing}}Hello {{thing}} {{thing.name}}{{/each}}{{/if}}").unwrap();
+        let rust = compile("{{#if some}}{{#each some as thing}}Hello {{thing}} {{thing.name}}{{/each}}{{/if}}");
         assert_eq!(rust, "if self.some.as_bool(){for thing_2 in self.some{f.write_str(\"Hello \")?;as_html(&(thing_2), f)?;f.write_str(\" \")?;as_html(&(thing_2.name), f)?;}}");
     }
 
     #[test]
     fn test_comment(){
-        let rust = Compiler::new().compile("Note: {{! This is a comment }} and {{!-- {{so is this}} --}}\\{{{{}}").unwrap();
+        let rust = compile("Note: {{! This is a comment }} and {{!-- {{so is this}} --}}\\{{{{}}");
         assert_eq!(rust, "f.write_str(\"Note: \")?;f.write_str(\" and \")?;f.write_str(\"{{\")?;");
     }
 
     #[test]
     fn test_scoping(){
-        let rust = Compiler::new().compile("{{#with some}}{{#with other}}Hello {{name}} {{../company}} {{/with}}{{/with}}").unwrap();
+        let rust = compile("{{#with some}}{{#with other}}Hello {{name}} {{../company}} {{/with}}{{/with}}");
         assert_eq!(rust, "{let this_1 = self.some;{let this_2 = this_1.other;f.write_str(\"Hello \")?;as_html(&(this_2.name), f)?;f.write_str(\" \")?;as_html(&(this_1.company), f)?;f.write_str(\" \")?;}}");
     }
 
     #[test]
     fn test_trimming(){
-        let rust = Compiler::new().compile("  {{~#if some ~}}   Hello{{~/if~}}").unwrap();
+        let rust = compile("  {{~#if some ~}}   Hello{{~/if~}}");
         assert_eq!(rust, "if self.some.as_bool(){f.write_str(\"Hello\")?;}");
     }
 
     #[test]
     fn test_indexer(){
-        let rust = Compiler::new().compile("{{#each things}}Hello{{{@index}}}{{#each things}}{{{lookup other @../index}}}{{{@index}}}{{/each}}{{/each}}").unwrap();
+        let rust = compile("{{#each things}}Hello{{{@index}}}{{#each things}}{{{lookup other @../index}}}{{{@index}}}{{/each}}{{/each}}");
         assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{f.write_str(\"Hello\")?;as_text(&(i_1),f)?;let mut i_2 = 0;for this_2 in this_1.things{as_text(&(this_2.other[i_1]),f)?;as_text(&(i_2),f)?;i_2 += 1;}i_1 += 1;}");
     }
 
     #[test]
     fn test_subexpression(){
-        let rust = Compiler::new().compile("{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}").unwrap();
+        let rust = compile("{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}");
         assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{{let other_2 = (self.other[i_1]);as_text(&(this_1.name),f)?;f.write_str(\": \")?;as_text(&(other_2),f)?;}i_1 += 1;}");
+    }
+
+    #[test]
+    fn test_selfless(){
+        let rust = Compiler::new().compile(None, "{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}").unwrap();
+        assert_eq!(rust, "let mut i_1 = 0;for this_1 in things{{let other_2 = (other[i_1]);as_text(&(this_1.name),f)?;f.write_str(\": \")?;as_text(&(other_2),f)?;}i_1 += 1;}");
     }
 }

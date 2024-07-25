@@ -97,7 +97,7 @@ impl Parse for DisplayParts{
         };
         #[cfg(not(feature = "minify-html"))]
         let src = buf.as_str();   
-        let content = match Compiler::new().compile(&src){
+        let content = match Compiler::new().compile(Some("self"), &src){
             Ok(rust) => rust,
             Err(err) => {
                 return Err(

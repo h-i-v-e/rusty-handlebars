@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en-nz">
+    <body style="font-family:monospace;color:#666;background-color:#fff;font-size:16px">
+        <p>Hello {{response.name}},</p>
+        <p>Here are the results you recently submitted for {{checklist.title}}</p>
+        <h3 style="color:#000">Asset</h3>
+        <p><b style="color:#000">{{asset_title}}</b> {{location}} {{address}}</p>
+        <h3 style="color:#000">Responses</h3>
+        <p>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align:left;color:#000">Item</th>
+                        <th style="color:#000">Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{~#each &checklist.items~}}
+                    <tr>
+                        <td style="padding-right:64px">{{title}}</td>
+                        {{~#if (lookup ../response.responses @index)}}<td style="color:#060;font-weight:bold">pass</td>{{else}}<td style="color:#c00;font-weight:bold">fail</td>{{/if~}}
+                    </tr>
+                    {{~/each~}}
+                </tbody>
+            </table>
+        </p>
+        {{~#with response~}}
+            {{#if notes~}}
+                <h3 style="color:#000">Notes</h3>
+                <p>{{notes}}</p>
+            {{~/if}}
+        {{~/with~}}
+        <p>The latest results can be viewed <a href="{{{link}}}" style="color:#00f;">here</a></p>
+        <br/>
+        <p>Kindest regards,</p>
+        <p style="color:#000">Some Dude</p>
+    </body>
+</html>
