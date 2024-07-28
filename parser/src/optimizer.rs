@@ -47,10 +47,13 @@ impl<'a> Write<'a>{
 }
 
 fn close(format: &str, args: &str, out: &mut String){
-    out.push_str(&format);
-    out.push('"');
-    out.push_str(&args);
-    out.push_str(CLOSE);
+    if !format.is_empty(){
+        out.push_str(OPEN);
+        out.push_str(&format);
+        out.push('"');
+        out.push_str(&args);
+        out.push_str(CLOSE);
+    }
 }
 
 pub(crate) fn optimize(src: String) -> String{
@@ -69,13 +72,7 @@ pub(crate) fn optimize(src: String) -> String{
                     args.push_str(first.args);
                 }
                 else{
-                    if !format.is_empty(){
-                        out.push_str(OPEN);
-                        out.push_str(&format);
-                        out.push('"');
-                        out.push_str(&args);
-                        out.push_str(CLOSE);
-                    }
+                    close(&format, &args, &mut out);
                     out.push_str(first.prefix);
                     format.clear();
                     args.clear();
@@ -95,13 +92,7 @@ pub(crate) fn optimize(src: String) -> String{
                     out.push_str(CLOSE);
                 }
                 else{
-                    if !format.is_empty(){
-                        out.push_str(OPEN);
-                        out.push_str(&format);
-                        out.push('"');
-                        out.push_str(&args);
-                        out.push_str(CLOSE);
-                    }
+                    close(&format, &args, &mut out);
                     out.push_str(first.prefix);
                     out.push_str(OPEN);
                     out.push_str(first.pattern);

@@ -1,6 +1,8 @@
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::Display;
+use std::fmt::Write;
 use optimizer::optimize;
 use regex::Captures;
 
@@ -152,8 +154,45 @@ struct Scope<'a>{
     indexer: Option<String>
 }
 
+pub struct Uses{
+    uses: HashSet<&'static str>
+}
+
+pub static USE_AS_DISPLAY: &str = "AsDisplay";
+pub static USE_AS_DISPLAY_HTML: &str = "AsDisplayHtml";
+
+impl Uses{
+    pub fn new() -> Self{
+        Self{
+            uses: HashSet::new()
+        }
+    }
+
+    pub fn insert(&mut self, use_: &'static str){
+        self.uses.insert(use_);
+    }
+}
+
+impl Display for Uses{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("use rusty_handlebars::")?;
+        if self.uses.is_empty(){
+            f.write_str("DisplayAsHtml")?;
+            return Ok(());
+        }
+        f.write_str("{DisplayAsHtml")?;
+        for use_ in &self.uses{
+            f.write_char(',')?;
+            f.write_str(use_)?;
+        }
+        f.write_char('}')?;
+        Ok(())
+    }
+}
+
 struct Compile<'a>{
-    open_stack: Vec<Scope<'a>>
+    open_stack: Vec<Scope<'a>>,
+    uses: Uses
 }
 
 fn contains_indexer(src: &str, mut depth: i32) -> bool{
@@ -217,7 +256,8 @@ impl<'a> Compile<'a>{
                 this,
                 local: Local::None,
                 indexer: None
-            }]
+            }],
+            uses: Uses::new()
         }
     }
 
@@ -422,6 +462,7 @@ impl<'a> Compile<'a>{
     fn resolve_if(&mut self, prefix: &str, rust: &mut String, token: Token) -> Result<()>{
         match token.next()? {
             Some(var) => {
+                self.uses.insert("AsBool");
                 rust.push_str("if ");
                 self.write_var(rust, var)?;
                 rust.push_str(".as_bool(){");
@@ -435,6 +476,7 @@ impl<'a> Compile<'a>{
     fn resolve_unless(&mut self, prefix: &str, rust: &mut String, token: Token) -> Result<()>{
         match token.next()? {
             Some(var) => {
+                self.uses.insert("AsBool");
                 rust.push_str("if !");
                 self.write_var(rust, var)?;
                 rust.push_str(".as_bool(){");
@@ -603,11 +645,12 @@ impl Compiler {
         rust.push_str("\")?;");
     }
 
-    fn write_resolve(&self, compile: &mut Compile, rust: &mut String, content: &str, display: &str) -> Result<()> {
+    fn write_resolve(&self, compile: &mut Compile, rust: &mut String, content: &str, display: &str, uses: &'static str) -> Result<()> {
+        compile.uses.insert(uses);
         compile.resolve(rust, content, "write!(f, \"{}\", ", display)
     }
 
-    pub fn compile(&self, this: Option<&str>, src: &str) -> Result<String>{
+    pub fn compile(&self, this: Option<&str>, src: &str) -> Result<(Uses, String)>{
         let mut compile = Compile::new(this);
         let mut rust = String::new();
         let mut rest = src;
@@ -622,8 +665,8 @@ impl Compiler {
             rest = postfix;
             self.write_str(&mut rust, prefix);
             match expression_type{
-                ExpressionType::Raw => self.write_resolve(&mut compile, &mut rust, content, ".as_display())?;")?,
-                ExpressionType::HtmlEscaped => self.write_resolve(&mut compile, &mut rust, content, ".as_display_html())?;")?,
+                ExpressionType::Raw => self.write_resolve(&mut compile, &mut rust, content, ".as_display())?;", USE_AS_DISPLAY)?,
+                ExpressionType::HtmlEscaped => self.write_resolve(&mut compile, &mut rust, content, ".as_display_html())?;", USE_AS_DISPLAY_HTML)?,
                 ExpressionType::Open => compile.open(&mut rust, prefix, content, postfix)?,
                 ExpressionType::Close => compile.close(&mut rust, expr.content.trim())?,
                 ExpressionType::Escaped => self.write_str(&mut rust, content),
@@ -632,7 +675,7 @@ impl Compiler {
             expression = expr.next()?;
         }
         self.write_str(&mut rust, rest);
-        Ok(optimize(rust))
+        Ok((compile.uses, optimize(rust)))
     }
 }
 
@@ -641,7 +684,7 @@ mod tests {
     use crate::*;
 
     fn compile(src: &str) -> String{
-        Compiler::new().compile(Some("self"), src).unwrap()
+        Compiler::new().compile(Some("self"), src).unwrap().1
     }
 
     #[test]
@@ -726,7 +769,8 @@ mod tests {
 
     #[test]
     fn test_selfless(){
-        let rust = Compiler::new().compile(None, "{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}").unwrap();
+        let (uses, rust) = Compiler::new().compile(None, "{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}").unwrap();
+        assert_eq!(uses.to_string(), "use rusty_handlebars::{DisplayAsHtml,AsDisplay}");
         assert_eq!(rust, "let mut i_1 = 0;for this_1 in things{{let other_2 = (other[i_1]);write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1 += 1;}");
     }
 }

@@ -1,6 +1,6 @@
 use minify_html::{minify, Cfg};
 use regex::Regex;
-use rusty_handlebars_parser::Compiler;
+use rusty_handlebars_parser::{Compiler, USE_AS_DISPLAY};
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use std::str::FromStr;
@@ -54,6 +54,7 @@ impl Parse for TemplateArgs{
 struct DisplayParts{
     name: Ident,
     generics: proc_macro2::TokenStream,
+    uses: Option<proc_macro2::TokenStream>,
     content: Option<proc_macro2::TokenStream>
 }
 
@@ -64,14 +65,14 @@ impl Parse for DisplayParts{
         let name = input.ident;
         let attr = match input.attrs.get(0){
             None => return Ok(Self{
-                name, generics: lifetimes, content: None
+                name, generics: lifetimes, uses: None, content: None
             }),
             Some(attr) => attr
         };
         let args = attr.parse_args::<TemplateArgs>()?;
         let src = match args.src{
             None => return Ok(Self{
-                name, generics: lifetimes, content: None
+                name, generics: lifetimes, uses: None, content: None
             }),
             Some(src) => src
         };
@@ -97,7 +98,7 @@ impl Parse for DisplayParts{
         };
         #[cfg(not(feature = "minify-html"))]
         let src = buf.as_str();   
-        let content = match Compiler::new().compile(Some("self"), &src){
+        let (mut uses, content) = match Compiler::new().compile(Some("self"), &src){
             Ok(rust) => rust,
             Err(err) => {
                 return Err(
@@ -108,8 +109,10 @@ impl Parse for DisplayParts{
                 )
             }
         };
+        uses.insert(USE_AS_DISPLAY);
         Ok(Self{
-          name, generics: lifetimes,
+            name, generics: lifetimes,
+            uses: Some(proc_macro2::token_stream::TokenStream::from_str(&uses.to_string()).unwrap()),
             content: Some(proc_macro2::token_stream::TokenStream::from_str(&content).unwrap())
         })
     }
@@ -118,7 +121,7 @@ impl Parse for DisplayParts{
 #[proc_macro_derive(DisplayAsHtml, attributes(Template))]
 pub fn make_renderable(raw: TokenStream) -> TokenStream{
     let DisplayParts{
-        name, generics, content
+        name, generics, uses, content
     } = parse_macro_input!(raw as DisplayParts);
 
     let mod_name = proc_macro2::token_stream::TokenStream::from_str((
@@ -130,7 +133,7 @@ pub fn make_renderable(raw: TokenStream) -> TokenStream{
         Some(content) => quote! {
             mod #mod_name{
                 use std::fmt::Display;
-                use rusty_handlebars::{DisplayAsHtml, AsDisplay, AsDisplayHtml, AsBool};
+                #uses;
                 use super::#name;
                 impl #generics Display for #name #cleaned_generics {
                     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -144,11 +147,6 @@ pub fn make_renderable(raw: TokenStream) -> TokenStream{
                         self
                     }
                 }
-                /*impl #lifetimes AsDisplayHtml for #name #lifetimes {
-                    fn as_display_html(&self) -> impl Display{
-                        self.to_string().as_display_html()
-                    }
-                }*/
             }
         },
         None => quote! {
