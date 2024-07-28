@@ -11,7 +11,10 @@ fn find_closing(src: &str) -> usize{
         match c{
             '\\' => escaped = !escaped,
             '"' if !escaped => return i,
-            _ => ()
+            _ => {
+                escaped = false;
+                ()
+            }
         }
     }
     panic!("unmatched quote near {}", src);

@@ -1,7 +1,10 @@
 [package]
 name = "rusty-handlebars-parser"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 
 [dependencies]
 regex.workspace = true
+
+[dev-dependencies]
+minify-html.workspace = true

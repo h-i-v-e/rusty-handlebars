@@ -65,6 +65,9 @@ impl<'a> Expression<'a>{
     fn close(expression_type: ExpressionType, preffix: &'a str, start: &'a str, end: &'static str) -> Result<Self>{
         match start.find(end){
             Some(mut pos) => {
+                if pos == 0{
+                    return Err(ParseError::new(format!("empty block near {}", rcap(preffix))));
+                }
                 let mut postfix = &start[pos + end.len() ..];
                 if &start[pos - 1 .. pos] == "~"{
                     postfix = postfix.trim_start();
@@ -626,13 +629,16 @@ pub struct Compiler{
 impl Compiler {
     pub fn new() -> Self{
         Self{
-            clean: Regex::new("[\\\\\"]").unwrap()
+            clean: Regex::new("[\\\\\"\\{\\}]").unwrap(),
         }
     }
 
     fn escape<'a>(&self, content: &'a str) -> Cow<'a, str> {
         self.clean.replace_all(
-            &content, |captures: &Captures| format!("\\{}", &captures[0])
+            &content, |captures: &Captures| match &captures[0]{
+                "{" | "}" => format!("{}{}", &captures[0], &captures[0]),
+                _ => format!("\\{}", &captures[0])
+            }
         )
     }
 
@@ -681,7 +687,27 @@ impl Compiler {
 
 #[cfg(test)]
 mod tests {
+    use core::str;
+
     use crate::*;
+    use minify_html::{minify, Cfg};
+
+    static CFG: Cfg = Cfg {
+        minify_js: true,
+        minify_css: true,
+        do_not_minify_doctype: true,
+        ensure_spec_compliant_unquoted_attribute_values: true,
+        keep_closing_tags: true,
+        keep_html_and_head_opening_tags: true,
+        keep_spaces_between_attributes: true,
+        keep_comments: false,
+        keep_input_type_text_attr: false,
+        keep_ssi_comments: false,
+        preserve_brace_template_syntax: true,
+        preserve_chevron_percent_template_syntax: false,
+        remove_bangs: false,
+        remove_processing_instructions: false
+    };
 
     fn compile(src: &str) -> String{
         Compiler::new().compile(Some("self"), src).unwrap().1
@@ -740,7 +766,7 @@ mod tests {
     #[test]
     fn test_comment(){
         let rust = compile("Note: {{! This is a comment }} and {{!-- {{so is this}} --}}\\{{{{}}");
-        assert_eq!(rust, "write!(f, \"Note:  and {{\")?;");
+        assert_eq!(rust, "write!(f, \"Note:  and {{{{\")?;");
     }
 
     #[test]
@@ -772,5 +798,19 @@ mod tests {
         let (uses, rust) = Compiler::new().compile(None, "{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}").unwrap();
         assert_eq!(uses.to_string(), "use rusty_handlebars::{DisplayAsHtml,AsDisplay}");
         assert_eq!(rust, "let mut i_1 = 0;for this_1 in things{{let other_2 = (other[i_1]);write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1 += 1;}");
+    }
+
+    #[test]
+    fn javascript(){
+        let (uses, rust) = Compiler::new().compile(None, "<script>if (location.href.contains(\"localhost\")){ console.log(\"\\{{{{}}}}\") }</script>").unwrap();
+        assert_eq!(uses.to_string(), "use rusty_handlebars::DisplayAsHtml");
+        assert_eq!(rust, "write!(f, \"<script>if (location.href.contains(\\\"localhost\\\")){{ console.log(\\\"{{{{}}}}\\\") }}</script>\")?;");
+    }
+
+    #[test]
+    fn complex(){
+        let (uses, rust) = Compiler::new().compile(None, unsafe { str::from_utf8_unchecked(minify(include_bytes!("../../examples/templates/index.hbs"), &CFG).as_slice()) }).unwrap();
+        assert_eq!(uses.to_string(), "use rusty_handlebars::{DisplayAsHtml,AsDisplay}");
+        assert_eq!(rust, "write!(f, \"<script>if (location.href.contains(\\\"localhost\\\")){{ console.log(\\\"{{{{}}}}\\\") }}</script>\")?;");
     }
 }

@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use serde_json::Value;
 
 use rusty_handlebars::{AsDisplay, DisplayAsHtml};
 
@@ -69,8 +70,39 @@ struct Wrapper<'a>{
     wrapped: &'a [Holder<'a>]
 }
 
+struct JsonMessages{
+    messages: Value
+}
+
+impl Display for JsonMessages{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result{
+        self.messages.fmt(f)
+    }
+}
+
+impl AsDisplay for JsonMessages{
+    fn as_display(&self) -> impl Display{
+        self
+    }
+}
+
+#[derive(DisplayAsHtml)]
+#[Template(path="examples/templates/index.hbs")]
+struct Index<'a>{
+    script: &'a str,
+    messages: JsonMessages
+}
+
 fn main(){
-    
+    println!("{}", Index{
+        script: "alert('Hello, world!')",
+        messages: JsonMessages{
+            messages: serde_json::json!({
+                "greeting": "Hello, world!",
+                "farewell": "Goodbye, world!"
+            })
+        }
+    }.to_string());
     println!("{}", ChecklistEmail{
         asset_title: "Asset 1234",
         address: "1234 Main St",
