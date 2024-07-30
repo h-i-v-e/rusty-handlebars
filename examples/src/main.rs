@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 use serde_json::Value;
 
 use rusty_handlebars::{AsDisplay, DisplayAsHtml};
@@ -93,7 +93,73 @@ struct Index<'a>{
     messages: JsonMessages
 }
 
+struct Location {
+    location: String,
+    address: Option<String>,
+}
+
+struct Owner {
+    name: String
+}
+
+struct Asset {
+    code: String,
+    owner: Option<Owner>,
+    title: String,
+    category: String,
+    properties: HashMap<String, Option<String>>,
+    location: Location
+}
+
+struct FormProperties {
+    title: Option<String>,
+    preamble: Option<String>
+}
+
+struct FormData {
+    name: Option<String>,
+    phone: Option<String>,
+    message: Option<String>,
+    items: Option<Vec<String>>,
+    rating: Option<i32>,
+}
+
+
+#[derive(DisplayAsHtml)]
+#[Template(path="examples/templates/map.hbs")]
+struct FormTemplateData<'a> {
+    properties: &'a FormProperties,
+    data: &'a FormData,
+    asset: &'a Asset
+}
+
 fn main(){
+    println!("{}", FormTemplateData{
+        properties: &FormProperties{
+            preamble: Some("Please fill out the form below".to_string()),
+            title: Some("Contact".to_string())
+        },
+        data: &FormData{
+            name: Some("John Doe".to_string()),
+            phone: Some("123-456-7890".to_string()),
+            message: Some("Hello, world!".to_string()),
+            items: Some(vec!["Item 1".to_string(), "Item 2".to_string()]),
+            rating: Some(5)
+        },
+        asset: &Asset{
+            code: "1234".to_string(),
+            owner: Some(Owner{
+                name: "John Doe".to_string()
+            }),
+            title: "Asset 1234".to_string(),
+            category: "Category".to_string(),
+            properties: HashMap::new(),
+            location: Location{
+                location: "Room 123".to_string(),
+                address: Some("1234 Main St".to_string())
+            }
+        }
+    }.to_string());
     println!("{}", Index{
         script: "alert('Hello, world!')",
         messages: JsonMessages{

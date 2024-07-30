@@ -1,6 +1,8 @@
 use std::fmt::{Display, Write};
 
+pub mod as_bool;
 pub use as_bool::AsBool;
+
 pub use rusty_handlebars_derive::DisplayAsHtml;
 #[cfg(feature = "parser")]
 pub use rusty_handlebars_parser::Compiler;

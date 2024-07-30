@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<body>
+<h2>{{properties.title}}</h2>
+{{#if some &properties.preamble}}
+<p>{{this}}</p>
+{{/if}}
+{{#if some &data.name}}
+    <p>As reported by {{this}} {{#if some &../data.phone}}(Ph: <a href="tel:{{{this}}}">{{this}}</a>){{/if}}</p>
+{{/if}}
+{{#if some data.rating}}
+<h4>Received a {{this}} star rating.</h4>
+{{/if}}
+{{#if some &data.message}}
+<p>{{this}}</p>
+{{/if}}
+{{#if some &data.items}}
+<p>The following items need to be replenished:</p>
+<div>
+    <ul>
+        {{#each this}}
+        <li>{{this}}</li>
+        {{/each}}
+    </ul>
+</div>
+{{/if}}
+<h3>Asset Details</h3>
+{{#with asset}}
+<table>
+    <thead>
+    <tr>
+        <th style="text-align:left;padding-right:2em">Asset</th>
+        <td style="text-align:left"><a href="https://tag.testintel.co.nz/tag/?st={{{code}}}">{{title}}</a></td>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <th style="text-align:left;padding-right:2em">Owner</th>
+        <td style="text-align:left">{{#if some &owner}}{{name}}{{/if}}</td>
+    </tr>
+    {{#each &properties}}
+    <tr>
+        <th style="text-align:left;padding-right:2em">{{@key}}</th>
+        <td style="text-align:left">{{@value}}</td>
+    </tr>
+    {{/each}}
+    {{#with &location}}
+    <tr>
+        <th style="text-align:left;padding-right:2em">Location</th>
+        <td style="text-align:left">{{location}}</td>
+    </tr>
+    <tr>
+        <th style="text-align:left;padding-right:2em">Address</th>
+        <td style="text-align:left">{{address}}</td>
+    </tr>
+    {{/with}}
+    </tbody>
+</table>
+{{/with}}
+</body>
+</html>

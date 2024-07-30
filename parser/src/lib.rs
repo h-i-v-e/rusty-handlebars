@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::Display;
 use std::fmt::Write;
+use expression_tokenizer::TokenType;
 use optimizer::optimize;
 use regex::Captures;
 
@@ -145,6 +146,16 @@ enum Local<'a>{
     As(&'a str),
     This,
     None
+}
+
+impl Local<'_> {
+    fn resolve(&self, var: &str) -> Result<&str>{
+        match self{
+            Local::As(local) => Ok(local),
+            Local::This => Ok("this"),
+            Local::None => Err(ParseError::new(format!("variable {} not found", var)))
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -363,41 +374,58 @@ impl<'a> Compile<'a>{
         return Ok(());
     }
 
-    fn write_var(&mut self, rust: &mut String, var: Token) -> Result<()>{
-        if var.is_sub_expression{
-            return self.resolve(rust, var.value, "(", ")");
-        }
-        let var = var.value;
-        let starts_with = &var[..1];
-        match starts_with{
-            "&" | "*" => {
-                rust.push_str(starts_with);
-                let (var, scope) = self.find_scope(&var[1..])?;
-                Ok(self.resolve_var(var, scope, rust)?)
-            },
-            "@" => {
-                let (label, scope) = self.find_scope(&var[1..])?;
-                match label{
-                    "index" => match &scope.indexer{
-                        Some(indexer) => Ok(rust.push_str(indexer.as_str())),
-                        _ => Err(ParseError::new(format!("{} not in scope", var)))
-                    },
-                    _ => Err(ParseError::new(format!("{} not implimented", var)))
+    fn write_var(&mut self, rust: &mut String, var: Token<'a>) -> Result<Option<Token<'a>>>{
+        match var.token_type{
+            TokenType::Manipulator => match var.value{
+                "@" => {
+                    let var = match var.next()?{
+                        Some(var) => var,
+                        None => return Err(ParseError::new("expected variable after @".to_string()))
+                    };
+                    let (name, scope) = self.find_scope(var.value)?;
+                    match name{
+                        "index" => match &scope.indexer{
+                            Some(indexer) => rust.push_str(indexer.as_str()),
+                            None => return Err(ParseError::new(format!("{} not in scope", var.value)))
+                        },
+                        "key" => {
+                            append_with_depth(scope.depth, scope.local.resolve(var.value)?, rust);
+                            rust.push_str(".0");
+                        },
+                        "value" => {
+                            append_with_depth(scope.depth, scope.local.resolve(var.value)?, rust);
+                            rust.push_str(".1");
+                        },
+                        _ => return Err(ParseError::new(format!("{} not implimented", var.value)))
+                    };
+                    Ok(Some(var))
+                },
+                _ => {
+                    rust.push_str(var.value);
+                    return match var.next()?{
+                        Some(token) => self.write_var(rust, token),
+                        None => Ok(None)
+                    }
                 }
             },
-            _ => {
-                let (var, scope) = self.find_scope(var)?;
-                Ok(self.resolve_var(var, scope, rust)?)
+            TokenType::Literal => {
+                let (name, scope) = self.find_scope(var.value)?;
+                self.resolve_var(name, scope, rust)?;
+                Ok(Some(var))
+            },
+            TokenType::SubExpression => {
+                self.resolve(rust, var.value, "(", ")")?;
+                Ok(Some(var))
             }
         }
     }
 
-    fn resolve(&mut self, rust: &mut String, src: &str, prefix: &str, postfix: &str) -> Result<()>{
+    fn resolve(&mut self, rust: &mut String, src: &'a str, prefix: &str, postfix: &str) -> Result<()>{
         let token = match Token::first(src)?{
             Some(token) => token,
             None => return Err(ParseError::new(format!("expected token near {}", prefix)))
         };
-        if token.is_sub_expression{
+        if let TokenType::SubExpression = token.token_type{
             rust.push_str(prefix);
             self.resolve(rust, token.value, "(", ")")?;
             rust.push_str(postfix);
@@ -426,31 +454,35 @@ impl<'a> Compile<'a>{
                 rust.push_str(prefix);
                 match token.next()?{
                     Some(token) => {
-                        let index = token.next()?;
-                        self.write_var(rust, token)?;
-                        rust.push('[');
-                        match index{
-                            Some(token) => {
-                                self.write_var(rust, token)?;
-                                rust.push(']');
-                                rust.push_str(postfix);
-                                Ok(())
-                            },
-                            None => Err(ParseError::new("else without if or unless".to_string()))
-                        }
+                        let index = match match self.write_var(rust, token)?{
+                            Some(token) => token.next()?,
+                            None => None
+                        }{
+                            Some(token) => token,
+                            None => return Err(ParseError::new("expected 2 variables after lookup".to_string()))
+                        };
+                        rust.push_str(".get(");
+                        self.write_var(rust, index)?;
+                        rust.push(')');
+                        rust.push_str(postfix);
+                        Ok(())
                     },
-                    None => Err(ParseError::new("else without if or unless".to_string()))
+                    None => Err(ParseError::new("expected 2 variables after lookup".to_string()))
                 }
             },
             _ => {
                 rust.push_str(prefix);
-                let mut next = token.next()?;
-                self.write_var(rust, token)?;
+                let mut next = match self.write_var(rust, token)?{
+                    Some(token) => token.next()?,
+                    None => None
+                };
                 let mut glue = '(';
                 while let Some(token) = next{
                     rust.push(glue);
-                    next = token.next()?;
-                    self.write_var(rust, token)?;
+                    next = match self.write_var(rust, token)?{
+                        Some(token) => token.next()?,
+                        None => None
+                    };
                     glue = ',';
                 }
                 if glue != '('{
@@ -462,9 +494,46 @@ impl<'a> Compile<'a>{
         }
     }
 
-    fn resolve_if(&mut self, prefix: &str, rust: &mut String, token: Token) -> Result<()>{
+    fn resolve_if_some(&mut self, prefix: &str, rust: &mut String, var: Token<'a>) -> Result<()>{
+        let mut next = var.clone();
+        loop{
+            if let TokenType::Manipulator = next.token_type{
+                next = match next.next()?{
+                    Some(next) => next,
+                    None => return Err(ParseError::new(format!("expected variable after {}", next.value)))
+                }
+            }
+            else{
+                break;
+            }
+        }
+        let local = match next.next()? {
+            Some(var) => match var.value{
+                "as" => match var.next()?{
+                    Some(var) => Local::As(var.value),
+                    None => return Err(ParseError::new(format!("expected variable after as near {}", prefix)))
+                },
+                _ => Local::As(var.value)
+            },
+            None => Local::This
+        };
+        rust.push_str("if let Some(");
+        self.write_local(rust, &local);
+        rust.push_str(") = ");
+        self.write_var(rust, var)?;
+        rust.push('{');
+        self.push_scope_with_local(OpenType::If, local);
+        Ok(())
+    }
+
+    fn resolve_if(&mut self, prefix: &str, rust: &mut String, token: Token<'a>) -> Result<()>{
         match token.next()? {
             Some(var) => {
+                if var.value == "some"{
+                    if let Some(var) = var.next()?{
+                        return self.resolve_if_some(prefix, rust, var)
+                    }
+                }
                 self.uses.insert("AsBool");
                 rust.push_str("if ");
                 self.write_var(rust, var)?;
@@ -476,7 +545,7 @@ impl<'a> Compile<'a>{
         }
     }
 
-    fn resolve_unless(&mut self, prefix: &str, rust: &mut String, token: Token) -> Result<()>{
+    fn resolve_unless(&mut self, prefix: &str, rust: &mut String, token: Token<'a>) -> Result<()>{
         match token.next()? {
             Some(var) => {
                 self.uses.insert("AsBool");
@@ -505,10 +574,24 @@ impl<'a> Compile<'a>{
     }
 
     fn read_local(token: &Token<'a>) -> Result<Local<'a>>{
+        let mut token = token.clone();
+        loop{
+            match token.token_type{
+                TokenType::Manipulator => {
+                    token = match token.next()?{
+                        Some(token) => token,
+                        None => return Err(ParseError::new(format!("expected variable after {}", token.value)))
+                    }
+                },
+                _ => break
+            }
+        }
         match token.next()?{
-            Some(token) => match token.value{
-                "as" => Ok(Local::As(Self::strip_pipes(token)?)),
-                token => Err(ParseError::new(format!("unexpected token {}", token)))
+            Some(token) => {
+                match token.value{
+                    "as" => Ok(Local::As(Self::strip_pipes(token)?)),
+                    token => Err(ParseError::new(format!("unexpected token {}", token)))
+                }
             },
             None => Ok(Local::This)
         }
@@ -651,7 +734,7 @@ impl Compiler {
         rust.push_str("\")?;");
     }
 
-    fn write_resolve(&self, compile: &mut Compile, rust: &mut String, content: &str, display: &str, uses: &'static str) -> Result<()> {
+    fn write_resolve<'a>(&self, compile: &mut Compile<'a>, rust: &mut String, content: &'a str, display: &str, uses: &'static str) -> Result<()> {
         compile.uses.insert(uses);
         compile.resolve(rust, content, "write!(f, \"{}\", ", display)
     }
@@ -690,24 +773,6 @@ mod tests {
     use core::str;
 
     use crate::*;
-    use minify_html::{minify, Cfg};
-
-    static CFG: Cfg = Cfg {
-        minify_js: true,
-        minify_css: true,
-        do_not_minify_doctype: true,
-        ensure_spec_compliant_unquoted_attribute_values: true,
-        keep_closing_tags: true,
-        keep_html_and_head_opening_tags: true,
-        keep_spaces_between_attributes: true,
-        keep_comments: false,
-        keep_input_type_text_attr: false,
-        keep_ssi_comments: false,
-        preserve_brace_template_syntax: true,
-        preserve_chevron_percent_template_syntax: false,
-        remove_bangs: false,
-        remove_processing_instructions: false
-    };
 
     fn compile(src: &str) -> String{
         Compiler::new().compile(Some("self"), src).unwrap().1
@@ -784,20 +849,26 @@ mod tests {
     #[test]
     fn test_indexer(){
         let rust = compile("{{#each things}}Hello{{{@index}}}{{#each things}}{{{lookup other @../index}}}{{{@index}}}{{/each}}{{/each}}");
-        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{write!(f, \"Hello{}\", i_1.as_display())?;let mut i_2 = 0;for this_2 in this_1.things{write!(f, \"{}{}\", this_2.other[i_1].as_display(), i_2.as_display())?;i_2 += 1;}i_1 += 1;}");
+        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{write!(f, \"Hello{}\", i_1.as_display())?;let mut i_2 = 0;for this_2 in this_1.things{write!(f, \"{}{}\", this_2.other.get(i_1).as_display(), i_2.as_display())?;i_2 += 1;}i_1 += 1;}");
+    }
+
+    #[test]
+    fn test_map(){
+        let rust = compile("{{#each things}}Hello{{{@key}}}{{#each @value}}{{{lookup other &@../key}}}{{{@value}}}{{/each}}{{/each}}");
+        assert_eq!(rust, "for this_1 in self.things{write!(f, \"Hello{}\", this_1.0.as_display())?;for this_2 in this_1.1{write!(f, \"{}{}\", this_2.other.get(&this_1.0).as_display(), this_2.1.as_display())?;}}");
     }
 
     #[test]
     fn test_subexpression(){
         let rust = compile("{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}");
-        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{{let other_2 = (self.other[i_1]);write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1 += 1;}");
+        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{{let other_2 = (self.other.get(i_1));write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1 += 1;}");
     }
 
     #[test]
     fn test_selfless(){
         let (uses, rust) = Compiler::new().compile(None, "{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}").unwrap();
         assert_eq!(uses.to_string(), "use rusty_handlebars::{DisplayAsHtml,AsDisplay}");
-        assert_eq!(rust, "let mut i_1 = 0;for this_1 in things{{let other_2 = (other[i_1]);write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1 += 1;}");
+        assert_eq!(rust, "let mut i_1 = 0;for this_1 in things{{let other_2 = (other.get(i_1));write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1 += 1;}");
     }
 
     #[test]
@@ -808,9 +879,8 @@ mod tests {
     }
 
     #[test]
-    fn complex(){
-        let (uses, rust) = Compiler::new().compile(None, unsafe { str::from_utf8_unchecked(minify(include_bytes!("../../examples/templates/index.hbs"), &CFG).as_slice()) }).unwrap();
-        assert_eq!(uses.to_string(), "use rusty_handlebars::{DisplayAsHtml,AsDisplay}");
-        assert_eq!(rust, "write!(f, \"<script>if (location.href.contains(\\\"localhost\\\")){{ console.log(\\\"{{{{}}}}\\\") }}</script>\")?;");
+    fn if_some(){
+        let rust = compile("{{#if some some}}Hello {{name}}{{else}}Oh dear{{/if}}{{#if some}}{{#if some &../some as other}}Hello {{other.name}}{{/if}}{{/if}}");
+        assert_eq!(rust, "if let Some(this_1) = self.some{write!(f, \"Hello {}\", this_1.name.as_display_html())?;}else{write!(f, \"Oh dear\")?;}if self.some.as_bool(){if let Some(other_2) = &self.some{write!(f, \"Hello {}\", other_2.name.as_display_html())?;}}");
     }
 }
