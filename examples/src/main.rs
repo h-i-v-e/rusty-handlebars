@@ -1,7 +1,8 @@
 use std::{collections::HashMap, fmt::Display};
 use serde_json::Value;
+use std::io::Write;
 
-use rusty_handlebars::{AsDisplay, DisplayAsHtml};
+use rusty_handlebars::{WithRustyHandlebars, AsDisplay};
 
 struct Checklist<'a, 'b>{
     title: &'a str,
@@ -18,7 +19,7 @@ struct ChecklistResponseSave{
     responses: Vec<bool>
 }
 
-#[derive(DisplayAsHtml)]
+#[derive(WithRustyHandlebars)]
 #[Template(path="examples/templates/email.hbs")]
 struct ChecklistEmail<'a, 'b, 'c>{
     asset_title: &'a str,
@@ -29,11 +30,11 @@ struct ChecklistEmail<'a, 'b, 'c>{
     link: &'a str
 }
 
-#[derive(DisplayAsHtml)]
+#[derive(WithRustyHandlebars)]
 #[Template(path="examples/templates/very-simple.hbs")]
 struct Simple{}
 
-#[derive(DisplayAsHtml)]
+#[derive(WithRustyHandlebars)]
 #[Template(path="examples/templates/more-involved.hbs")]
 struct MoreInvolved<'a>{
     name: &'a str,
@@ -41,13 +42,13 @@ struct MoreInvolved<'a>{
 }
 
 
-#[derive(DisplayAsHtml)]
+#[derive(WithRustyHandlebars)]
 #[Template(path="examples/templates/with-options.hbs")]
 struct WithOptions<'a>{
     options: &'a [Option<&'a str>]
 }
 
-#[derive(DisplayAsHtml)]
+#[derive(WithRustyHandlebars)]
 #[Template(path="examples/templates/lookups.hbs")]
 struct Lookups<'a>{
     names: &'a [&'a str],
@@ -64,7 +65,7 @@ impl<'a> AsDisplay for &Holder<'a>{
     }
 }
 
-#[derive(DisplayAsHtml)]
+#[derive(WithRustyHandlebars)]
 #[Template(path="examples/templates/wrapper.hbs")]
 struct Wrapper<'a>{
     wrapped: &'a [Holder<'a>]
@@ -86,7 +87,7 @@ impl AsDisplay for JsonMessages{
     }
 }
 
-#[derive(DisplayAsHtml)]
+#[derive(WithRustyHandlebars)]
 #[Template(path="examples/templates/index.hbs")]
 struct Index<'a>{
     script: &'a str,
@@ -124,8 +125,7 @@ struct FormData {
     rating: Option<i32>,
 }
 
-
-#[derive(DisplayAsHtml)]
+#[derive(WithRustyHandlebars)]
 #[Template(path="examples/templates/map.hbs")]
 struct FormTemplateData<'a> {
     properties: &'a FormProperties,

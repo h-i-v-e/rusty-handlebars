@@ -1,19 +1,19 @@
 [package]
 name = "rusty-handlebars-derive"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 
 [lib]
 proc-macro = true
 
 [dependencies]
+minify-html = {workspace = true, optional = true}
 proc-macro2 = "1.0.36"
 quote = "1.0.15"
 regex.workspace = true
 rusty-handlebars-parser = {path = "../parser"}
 syn = {version = "^2.0.0", features = ["full"]}
-minify-html = {workspace = true, optional = true}
 
 [features]
-minify-html = ["dep:minify-html"]
+minify-html = ["dep:minify-html", "rusty-handlebars-parser/minify-html"]
 default = ["minify-html"]

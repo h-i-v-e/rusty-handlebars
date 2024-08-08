@@ -1,4 +1,4 @@
-use crate::Result;
+use crate::error::{Result, ParseError, rcap, parse_error_near};
 
 #[derive(Clone)]
 pub enum TokenType{
@@ -26,7 +26,7 @@ fn find_closing(src: &str) -> Result<usize>{
             return Ok(i);
         }
     }
-    Err(crate::ParseError { message: format!("unmatched bracket near {}", src) })
+    parse_error_near!(src, "unmatched bracket")
 }
 
 fn find_end(src: &str) -> usize{

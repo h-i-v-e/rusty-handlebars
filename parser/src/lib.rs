@@ -1,140 +1,25 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
-use std::error::Error;
 use std::fmt::Display;
 use std::fmt::Write;
+use expression::ExpressionType;
 use expression_tokenizer::TokenType;
 use optimizer::optimize;
 use regex::Captures;
+#[cfg(feature = "minify_html")]
+use minify_html::Cfg;
 
 use regex::Regex;
 
+mod error;
+mod expression;
 mod expression_tokenizer;
 mod optimizer;
+pub mod build_helper;
 
+use error::{ParseError, Result, rcap, parse_error_near};
 use expression_tokenizer::Token;
-
-enum ExpressionType{
-    Comment, HtmlEscaped, Raw, Open, Close, Escaped
-}
-
-struct Expression<'a>{
-    expression_type: ExpressionType,
-    prefix: &'a str,
-    content: &'a str,
-    postfix: &'a str
-}
-
-#[derive(Debug)]
-pub struct ParseError{
-    message: String
-}
-
-fn rcap<'a>(src: &'a str) -> &'a str{
-    static CAP_AT: usize = 32;
-
-    if src.len() > CAP_AT{
-        &src[src.len() - CAP_AT ..]
-    } else {
-        src
-    }
-}
-
-impl ParseError{
-    fn new(message: String) -> Self{
-        Self{
-            message
-        }
-    }
-
-    fn unclosed(preffix: &str) -> Self{
-        Self::new(format!("Unclosed block near {}", rcap(preffix)))
-    }
-}
-
-impl Display for ParseError{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.message)
-    }
-}
-
-impl Error for ParseError{}
-
-type Result<T> = std::result::Result<T, ParseError>;
-
-impl<'a> Expression<'a>{
-    fn close(expression_type: ExpressionType, preffix: &'a str, start: &'a str, end: &'static str) -> Result<Self>{
-        match start.find(end){
-            Some(mut pos) => {
-                if pos == 0{
-                    return Err(ParseError::new(format!("empty block near {}", rcap(preffix))));
-                }
-                let mut postfix = &start[pos + end.len() ..];
-                if &start[pos - 1 .. pos] == "~"{
-                    postfix = postfix.trim_start();
-                    pos -= 1;
-                } 
-                Ok(Self { expression_type, prefix: preffix, content: &start[.. pos], postfix })
-            },
-            None => Err(ParseError::unclosed(preffix))
-        }
-    }
-
-    fn check_comment(preffix: &'a str, start: &'a str) -> Result<Self>{
-        if let Some(pos) = start.find("--"){
-            if pos == 0{
-                return Self::close(ExpressionType::Comment, preffix, &start[2 ..], "--}}");
-            }
-        }
-        Self::close(ExpressionType::Comment, preffix, start, "}}")
-    }
-
-    fn from(src: &'a str) -> Result<Option<Self>>{
-        match src.find("{{"){
-            Some(start) => {
-                let mut second = start + 3;
-                if second >= src.len(){
-                    return Err(ParseError::unclosed(src));
-                }
-                if start > 0 && &src[start - 1 .. start] == "\\"{
-                    return Ok(Some(Self::close(ExpressionType::Escaped, &src[.. start - 1], &src[second - 1 ..], "}}")?));
-                }
-                let mut prefix = &src[.. start];
-                let mut marker = &src[start + 2 .. second];
-                if marker == "~"{
-                    prefix = prefix.trim_end();
-                    second += 1;
-                    if second >= src.len(){
-                        return Err(ParseError::unclosed(src));
-                    }
-                    marker = &src[start + 3 .. second];
-                }
-                Ok(Some(match marker{
-                    "{" => {
-                        let next = second + 1;
-                        if next >= src.len(){
-                            return Err(ParseError::unclosed(src));
-                        }
-                        if &src[second .. next] == "~"{
-                            second = next;
-                            prefix = prefix.trim_end();
-                        }
-                        Self::close(ExpressionType::Raw, prefix, &src[second ..], "}}}")?
-                    },
-                    "!" => Self::check_comment(prefix, &src[second ..])?,
-                    "#" => Self::close(ExpressionType::Open, prefix, &src[second ..], "}}")?,
-                    "/" => Self::close(ExpressionType::Close, prefix, &src[second ..], "}}")?,
-                    _ => Self::close(ExpressionType::HtmlEscaped, prefix, &src[second - 1 ..], "}}")?
-                }))
-            },
-            None => Ok(None)
-        }
-    }
-
-    fn next(&self) -> Result<Option<Self>>{
-        Self::from(self.postfix)
-    }
-}
+use expression::Expression;
 
 #[derive(Debug)]
 enum OpenType{
@@ -185,21 +70,28 @@ impl Uses{
     pub fn insert(&mut self, use_: &'static str){
         self.uses.insert(use_);
     }
+
+    pub fn remove(&mut self, use_: &'static str){
+        self.uses.remove(use_);
+    }
 }
 
 impl Display for Uses{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("use rusty_handlebars::")?;
-        if self.uses.is_empty(){
-            f.write_str("DisplayAsHtml")?;
-            return Ok(());
+        match self.uses.len(){
+            0 => (),
+            1 => write!(f, "use rusty_handlebars::{};", self.uses.iter().next().unwrap())?,
+            _ => {
+                f.write_str("use rusty_handlebars::")?;
+                let mut glue = '{';
+                for use_ in &self.uses{
+                    f.write_char(glue)?;
+                    f.write_str(use_)?;
+                    glue = ',';
+                }
+                f.write_str("};")?;
+            }
         }
-        f.write_str("{DisplayAsHtml")?;
-        for use_ in &self.uses{
-            f.write_char(',')?;
-            f.write_str(use_)?;
-        }
-        f.write_char('}')?;
         Ok(())
     }
 }
@@ -500,7 +392,7 @@ impl<'a> Compile<'a>{
             if let TokenType::Manipulator = next.token_type{
                 next = match next.next()?{
                     Some(next) => next,
-                    None => return Err(ParseError::new(format!("expected variable after {}", next.value)))
+                    None => return parse_error_near!(prefix, "expected variable")
                 }
             }
             else{
@@ -511,7 +403,7 @@ impl<'a> Compile<'a>{
             Some(var) => match var.value{
                 "as" => match var.next()?{
                     Some(var) => Local::As(var.value),
-                    None => return Err(ParseError::new(format!("expected variable after as near {}", prefix)))
+                    None => return parse_error_near!(prefix, "expected variable after as")
                 },
                 _ => Local::As(var.value)
             },
@@ -541,7 +433,7 @@ impl<'a> Compile<'a>{
                 self.push_scope(OpenType::If);
                 Ok(())
             },
-            None => Err(ParseError::new(format!("expected variable after if near {}", prefix)))
+            None => parse_error_near!(prefix, "expected variable after if")
         }
     }
 
@@ -555,7 +447,7 @@ impl<'a> Compile<'a>{
                 self.push_scope(OpenType::Unless);
                 Ok(())
             }
-            None => Err(ParseError::new(format!("expected variable after unless near {}", prefix)))
+            None => parse_error_near!(prefix, "expected variable after unless")
         }
     }
 
@@ -617,7 +509,7 @@ impl<'a> Compile<'a>{
         })?;
         let next = match token.next()?{
             Some(next) => next,
-            None => return Err(ParseError::new(format!("expected variable after each near {}", prefix)))
+            None => return parse_error_near!(prefix, "expected variable after each")
         };
         let local = Self::read_local(&next)?;
         rust.push_str("for ");
@@ -641,7 +533,7 @@ impl<'a> Compile<'a>{
         let depth = self.open_stack.len();
         let token = match token.next()?{
             Some(token) => token,
-            None => return Err(ParseError::new(format!("expected variable after with near {}", prefix)))
+            None => return parse_error_near!(prefix, "expected variable after with")
         };
         let local = Self::read_local(&token)?;
         rust.push_str("{let ");
@@ -664,7 +556,7 @@ impl<'a> Compile<'a>{
         //self.debug_stack();
         let scope = match self.open_stack.pop() {
             Some(scope) => scope,
-            None => return Err(ParseError::new(format!("Mismatched block near {}", rcap(content))))
+            None => return parse_error_near!(content, "Mismatched block")
         };
         if !match scope.opened{
             OpenType::If => content == "if",
@@ -705,14 +597,24 @@ impl<'a> Compile<'a>{
     }
 } 
 
-pub struct Compiler{
-    clean: Regex
+#[derive(Clone, Copy)]
+pub struct Options<'a>{
+    pub root_var_name: Option<&'a str>,
+    pub write_var_name: &'a str,
+    #[cfg(feature = "minify_html")]
+    pub minify_cfg: Option<Cfg>
 }
 
-impl Compiler {
-    pub fn new() -> Self{
+pub struct Compiler<'o>{
+    clean: Regex,
+    options: Options<'o>
+}
+
+impl<'o> Compiler<'o> {
+    pub fn new(options: Options<'o>) -> Self{
         Self{
             clean: Regex::new("[\\\\\"\\{\\}]").unwrap(),
+            options
         }
     }
 
@@ -725,22 +627,28 @@ impl Compiler {
         )
     }
 
+    fn push_write(&self, rust: &mut String){
+        rust.push_str("write!(");
+        rust.push_str(self.options.write_var_name);
+    }
+
     fn write_str(&self, rust: &mut String, content: &str) {
         if content.is_empty(){
             return;
         }
-        rust.push_str("write!(f, \"");
+        self.push_write(rust);
+        rust.push_str(", \"");
         rust.push_str(self.escape(content).as_ref());
         rust.push_str("\")?;");
     }
 
     fn write_resolve<'a>(&self, compile: &mut Compile<'a>, rust: &mut String, content: &'a str, display: &str, uses: &'static str) -> Result<()> {
         compile.uses.insert(uses);
-        compile.resolve(rust, content, "write!(f, \"{}\", ", display)
+        compile.resolve(rust, content, &format!("write!({}, \"{{}}\", ", self.options.write_var_name), display)
     }
 
-    pub fn compile(&self, this: Option<&str>, src: &str) -> Result<(Uses, String)>{
-        let mut compile = Compile::new(this);
+    pub fn compile(&self, src: &str) -> Result<(Uses, String)>{
+        let mut compile = Compile::new(self.options.root_var_name);
         let mut rust = String::new();
         let mut rest = src;
         let mut expression = Expression::from(src)?;
@@ -764,7 +672,7 @@ impl Compiler {
             expression = expr.next()?;
         }
         self.write_str(&mut rust, rest);
-        Ok((compile.uses, optimize(rust)))
+        Ok((compile.uses, optimize(rust, self.options.write_var_name)))
     }
 }
 
@@ -774,8 +682,13 @@ mod tests {
 
     use crate::*;
 
+    static OPTIONS: Options = Options{
+        root_var_name: Some("self"),
+        write_var_name: "f"
+    };
+
     fn compile(src: &str) -> String{
-        Compiler::new().compile(Some("self"), src).unwrap().1
+        Compiler::<'static>::new(OPTIONS).compile(src).unwrap().1
     }
 
     #[test]
@@ -866,15 +779,18 @@ mod tests {
 
     #[test]
     fn test_selfless(){
-        let (uses, rust) = Compiler::new().compile(None, "{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}").unwrap();
-        assert_eq!(uses.to_string(), "use rusty_handlebars::{DisplayAsHtml,AsDisplay}");
+        let (uses, rust) = Compiler::new(Options{
+            root_var_name: None,
+            write_var_name: "f"
+        }).compile("{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}").unwrap();
+        assert_eq!(uses.to_string(), "use rusty_handlebars::AsDisplay");
         assert_eq!(rust, "let mut i_1 = 0;for this_1 in things{{let other_2 = (other.get(i_1));write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1 += 1;}");
     }
 
     #[test]
     fn javascript(){
-        let (uses, rust) = Compiler::new().compile(None, "<script>if (location.href.contains(\"localhost\")){ console.log(\"\\{{{{}}}}\") }</script>").unwrap();
-        assert_eq!(uses.to_string(), "use rusty_handlebars::DisplayAsHtml");
+        let (uses, rust) = Compiler::new(OPTIONS).compile("<script>if (location.href.contains(\"localhost\")){ console.log(\"\\{{{{}}}}\") }</script>").unwrap();
+        assert_eq!(uses.to_string(), "");
         assert_eq!(rust, "write!(f, \"<script>if (location.href.contains(\\\"localhost\\\")){{ console.log(\\\"{{{{}}}}\\\") }}</script>\")?;");
     }
 

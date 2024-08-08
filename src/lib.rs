@@ -3,11 +3,13 @@ use std::fmt::{Display, Write};
 pub mod as_bool;
 pub use as_bool::AsBool;
 
-pub use rusty_handlebars_derive::DisplayAsHtml;
+#[cfg(feature = "derive")]
+pub use rusty_handlebars_derive::WithRustyHandlebars;
 #[cfg(feature = "parser")]
-pub use rusty_handlebars_parser::Compiler;
+pub use rusty_handlebars_parser::{Compiler, Options, build_helper::generate_function_from_file};
 
-pub trait DisplayAsHtml : Display{}
+#[cfg(feature = "derive")]
+pub trait WithRustyHandlebars : Display{}
 
 macro_rules! impl_as_display {
     ($($t:ty),*) => {
@@ -117,22 +119,6 @@ impl AsDisplayHtml for &&str{
         DisplayHtml{string: *self}
     }
 }
-
-/*struct DisplayAsHtmlAsDisplayHtml<'a, T: DisplayAsHtml>{
-    item: &'a T
-}*/
-
-/*impl<'a, T: DisplayAsHtml> Display for DisplayAsHtmlAsDisplayHtml<'a, T>{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.item.to_string().as_display_html().fmt(f)
-    }
-}*/
-
-/*impl <T: DisplayAsHtml> AsDisplayHtml for T{
-    fn as_display_html(&self) -> impl Display {
-        DisplayAsHtmlAsDisplayHtml{item: self}
-    }
-}*/
 
 impl AsDisplayHtml for String{
     fn as_display_html(&self) -> impl Display {

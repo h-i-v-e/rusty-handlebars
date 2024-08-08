@@ -1,30 +1,12 @@
-use minify_html::{minify, Cfg};
+use minify_html::minify;
 use regex::Regex;
-use rusty_handlebars_parser::{Compiler, USE_AS_DISPLAY};
+use rusty_handlebars_parser::{build_helper, Compiler, Options, USE_AS_DISPLAY};
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use std::str::FromStr;
 use syn::parse::{Parse, ParseStream};
 use syn::{parse_macro_input, DeriveInput, Ident, Result, LitStr, Token};
 use syn::spanned::Spanned;
-
-#[cfg(feature = "minify-html")]
-static COMPRESS_CONFIG: Cfg = Cfg {
-    minify_js: true,
-    minify_css: true,
-    do_not_minify_doctype: true,
-    ensure_spec_compliant_unquoted_attribute_values: true,
-    keep_closing_tags: true,
-    keep_html_and_head_opening_tags: true,
-    keep_spaces_between_attributes: true,
-    keep_comments: false,
-    keep_input_type_text_attr: false,
-    keep_ssi_comments: false,
-    preserve_brace_template_syntax: true,
-    preserve_chevron_percent_template_syntax: false,
-    remove_bangs: false,
-    remove_processing_instructions: false
-};
 
 struct TemplateArgs{
     src: Option<String>
@@ -54,8 +36,8 @@ impl Parse for TemplateArgs{
 struct DisplayParts{
     name: Ident,
     generics: proc_macro2::TokenStream,
-    uses: Option<proc_macro2::TokenStream>,
-    content: Option<proc_macro2::TokenStream>
+    uses: proc_macro2::TokenStream,
+    content: proc_macro2::TokenStream
 }
 
 impl Parse for DisplayParts{
@@ -64,16 +46,22 @@ impl Parse for DisplayParts{
         let lifetimes = input.generics.into_token_stream();
         let name = input.ident;
         let attr = match input.attrs.get(0){
-            None => return Ok(Self{
-                name, generics: lifetimes, uses: None, content: None
-            }),
+            None => return Err(
+                syn::Error::new(
+                    name.span(),
+                    "missing Template macro"
+                )
+            ),
             Some(attr) => attr
         };
         let args = attr.parse_args::<TemplateArgs>()?;
         let src = match args.src{
-            None => return Ok(Self{
-                name, generics: lifetimes, uses: None, content: None
-            }),
+            None => return Err(
+                syn::Error::new(
+                    attr.span(),
+                    "missing path attribute in Template macro"
+                )
+            ),
             Some(src) => src
         };
         let buf = match std::fs::read_to_string(&src) {
@@ -91,14 +79,17 @@ impl Parse for DisplayParts{
             }
         };
         #[cfg(feature = "minify-html")]
-        let buf = minify(buf.as_bytes(), &COMPRESS_CONFIG);
+        let buf = minify(buf.as_bytes(), &build_helper::COMPRESS_CONFIG);
         #[cfg(feature = "minify-html")]   
         let src = unsafe{
             std::str::from_utf8_unchecked(&buf)
         };
         #[cfg(not(feature = "minify-html"))]
         let src = buf.as_str();   
-        let (mut uses, content) = match Compiler::new().compile(Some("self"), &src){
+        let (mut uses, content) = match Compiler::new(Options{
+            write_var_name: "f",
+            root_var_name: Some("self")
+        }).compile(&src){
             Ok(rust) => rust,
             Err(err) => {
                 return Err(
@@ -109,57 +100,43 @@ impl Parse for DisplayParts{
                 )
             }
         };
+        uses.insert("WithRustyHandlebars");
         uses.insert(USE_AS_DISPLAY);
         Ok(Self{
             name, generics: lifetimes,
-            uses: Some(proc_macro2::token_stream::TokenStream::from_str(&uses.to_string()).unwrap()),
-            content: Some(proc_macro2::token_stream::TokenStream::from_str(&content).unwrap())
+            uses: proc_macro2::token_stream::TokenStream::from_str(&uses.to_string())?,
+            content: proc_macro2::token_stream::TokenStream::from_str(&content)?
         })
     }
 }
 
-#[proc_macro_derive(DisplayAsHtml, attributes(Template))]
+#[proc_macro_derive(WithRustyHandlebars, attributes(Template))]
 pub fn make_renderable(raw: TokenStream) -> TokenStream{
     let DisplayParts{
         name, generics, uses, content
     } = parse_macro_input!(raw as DisplayParts);
 
     let mod_name = proc_macro2::token_stream::TokenStream::from_str((
-        format!("{}_to_html_impl", name.to_string().to_lowercase())
+        format!("{}_with_rusty_handlebars_impl", name.to_string().to_lowercase())
     ).as_str()).unwrap();
     let generics_str = generics.to_string();
     let cleaned_generics = proc_macro2::token_stream::TokenStream::from_str(Regex::new(r":[^,>]+").unwrap().replace(&generics_str, "").as_ref()).unwrap();
-    TokenStream::from(match content {
-        Some(content) => quote! {
-            mod #mod_name{
-                use std::fmt::Display;
-                #uses;
-                use super::#name;
-                impl #generics Display for #name #cleaned_generics {
-                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                        #content
-                        Ok(())
-                    }
-                }
-                impl #generics DisplayAsHtml for #name #cleaned_generics {}
-                impl #generics AsDisplay for #name #cleaned_generics {
-                    fn as_display(&self) -> impl Display{
-                        self
-                    }
+    TokenStream::from(quote! {
+        mod #mod_name{
+            use std::fmt::Display;
+            #uses
+            use super::#name;
+            impl #generics Display for #name #cleaned_generics {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    #content
+                    Ok(())
                 }
             }
-        },
-        None => quote! {
-            mod #mod_name{
-                use std::fmt::Display;
-                use rusty_handlebars::DisplayAsHtml;
-                use super::#name;
-                impl #generics Display for #name #generics {
-                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                        Ok(())
-                    }
+            impl #generics WithRustyHandlebars for #name #cleaned_generics {}
+            impl #generics AsDisplay for #name #cleaned_generics {
+                fn as_display(&self) -> impl Display{
+                    self
                 }
-                impl #generics DisplayAsHtml for #name #generics {}
             }
         }
     })
