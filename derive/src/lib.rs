@@ -112,7 +112,7 @@ impl Parse for DisplayParts{
     }
 }
 
-#[proc_macro_derive(WithRustyHandlebars, attributes(Template))]
+#[proc_macro_derive(WithRustyHandlebars, attributes(template))]
 pub fn make_renderable(raw: TokenStream) -> TokenStream{
     let DisplayParts{
         name, generics, uses, content
