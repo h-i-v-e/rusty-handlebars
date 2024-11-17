@@ -49,7 +49,7 @@ impl Parse for DisplayParts{
             None => return Err(
                 syn::Error::new(
                     name.span(),
-                    "missing Template macro"
+                    "missing template macro"
                 )
             ),
             Some(attr) => attr
@@ -59,7 +59,7 @@ impl Parse for DisplayParts{
             None => return Err(
                 syn::Error::new(
                     attr.span(),
-                    "missing path attribute in Template macro"
+                    "missing path attribute in template macro"
                 )
             ),
             Some(src) => src
