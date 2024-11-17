@@ -16,12 +16,12 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {{~#each &checklist.items~}}
+                    {{~#each_ref checklist.items~}}
                     <tr>
                         <td style="padding-right:64px">{{title}}</td>
                         {{~#if (lookup ../response.responses @index)}}<td style="color:#060;font-weight:bold">pass</td>{{else}}<td style="color:#c00;font-weight:bold">fail</td>{{/if~}}
                     </tr>
-                    {{~/each~}}
+                    {{~/each_ref~}}
                 </tbody>
             </table>
         </p>

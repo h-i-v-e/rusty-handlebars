@@ -1,6 +1,6 @@
 use minify_html::minify;
 use regex::Regex;
-use rusty_handlebars_parser::{build_helper, Compiler, Options, USE_AS_DISPLAY};
+use rusty_handlebars_parser::{add_builtins, build_helper, BlockMap, Compiler, Options, USE_AS_DISPLAY};
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use std::str::FromStr;
@@ -85,11 +85,13 @@ impl Parse for DisplayParts{
             std::str::from_utf8_unchecked(&buf)
         };
         #[cfg(not(feature = "minify-html"))]
-        let src = buf.as_str();   
-        let (mut uses, content) = match Compiler::new(Options{
+        let src = buf.as_str();
+        let mut factories = BlockMap::new();
+        add_builtins(&mut factories);
+        let mut rust = match Compiler::new(Options{
             write_var_name: "f",
             root_var_name: Some("self")
-        }).compile(&src){
+        }, factories).compile(&src){
             Ok(rust) => rust,
             Err(err) => {
                 return Err(
@@ -100,12 +102,12 @@ impl Parse for DisplayParts{
                 )
             }
         };
-        uses.insert("WithRustyHandlebars");
-        uses.insert(USE_AS_DISPLAY);
+        rust.using.insert("WithRustyHandlebars");
+        rust.using.insert(USE_AS_DISPLAY);
         Ok(Self{
             name, generics: lifetimes,
-            uses: proc_macro2::token_stream::TokenStream::from_str(&uses.to_string())?,
-            content: proc_macro2::token_stream::TokenStream::from_str(&content)?
+            uses: proc_macro2::token_stream::TokenStream::from_str(&rust.uses().to_string())?,
+            content: proc_macro2::token_stream::TokenStream::from_str(&rust.code)?
         })
     }
 }
@@ -124,7 +126,7 @@ pub fn make_renderable(raw: TokenStream) -> TokenStream{
     TokenStream::from(quote! {
         mod #mod_name{
             use std::fmt::Display;
-            #uses
+            #uses;
             use super::#name;
             impl #generics Display for #name #cleaned_generics {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

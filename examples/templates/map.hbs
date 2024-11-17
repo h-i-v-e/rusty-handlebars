@@ -2,19 +2,19 @@
 <html lang="en">
 <body>
 <h2>{{properties.title}}</h2>
-{{#if some &properties.preamble}}
+{{#if_some_ref properties.preamble}}
 <p>{{this}}</p>
 {{/if}}
-{{#if some &data.name}}
-    <p>As reported by {{this}} {{#if some &../data.phone}}(Ph: <a href="tel:{{{this}}}">{{this}}</a>){{/if}}</p>
+{{#if_some_ref data.name}}
+    <p>As reported by {{this}} {{#if_some_ref ../data.phone}}(Ph: <a href="tel:{{{this}}}">{{this}}</a>){{/if}}</p>
 {{/if}}
-{{#if some data.rating}}
+{{#if_some data.rating}}
 <h4>Received a {{this}} star rating.</h4>
 {{/if}}
-{{#if some &data.message}}
+{{#if_some_ref data.message}}
 <p>{{this}}</p>
 {{/if}}
-{{#if some &data.items}}
+{{#if_some_ref data.items}}
 <p>The following items need to be replenished:</p>
 <div>
     <ul>
@@ -36,15 +36,15 @@
     <tbody>
     <tr>
         <th style="text-align:left;padding-right:2em">Owner</th>
-        <td style="text-align:left">{{#if some &owner}}{{name}}{{/if}}</td>
+        <td style="text-align:left">{{#if_some_ref owner}}{{name}}{{/if}}</td>
     </tr>
-    {{#each &properties}}
+    {{#each_ref properties}}
     <tr>
         <th style="text-align:left;padding-right:2em">{{@key}}</th>
         <td style="text-align:left">{{@value}}</td>
     </tr>
     {{/each}}
-    {{#with &location}}
+    {{#with_ref location}}
     <tr>
         <th style="text-align:left;padding-right:2em">Location</th>
         <td style="text-align:left">{{location}}</td>

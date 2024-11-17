@@ -3,12 +3,11 @@ use std::fmt::{Display, Write};
 pub mod as_bool;
 pub use as_bool::AsBool;
 
-#[cfg(feature = "derive")]
-pub use rusty_handlebars_derive::WithRustyHandlebars;
-#[cfg(feature = "parser")]
-pub use rusty_handlebars_parser::{Compiler, Options, build_helper::generate_function_from_file};
 
-#[cfg(feature = "derive")]
+pub use rusty_handlebars_derive::WithRustyHandlebars;
+
+#[cfg(feature = "parser")]
+pub use rusty_handlebars_parser::{Compiler, Options};
 pub trait WithRustyHandlebars : Display{}
 
 macro_rules! impl_as_display {

@@ -1,9 +1,6 @@
 use std::{collections::HashMap, fmt::Display};
-use serde_json::Value;
-use std::io::Write;
 
-use rusty_handlebars::{WithRustyHandlebars, AsDisplay};
-
+use rusty_handlebars::{AsDisplay, WithRustyHandlebars};
 struct Checklist<'a, 'b>{
     title: &'a str,
     items: Vec<ChecklistItem<'b>>
@@ -71,28 +68,6 @@ struct Wrapper<'a>{
     wrapped: &'a [Holder<'a>]
 }
 
-struct JsonMessages{
-    messages: Value
-}
-
-impl Display for JsonMessages{
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result{
-        self.messages.fmt(f)
-    }
-}
-
-impl AsDisplay for JsonMessages{
-    fn as_display(&self) -> impl Display{
-        self
-    }
-}
-
-#[derive(WithRustyHandlebars)]
-#[Template(path="examples/templates/index.hbs")]
-struct Index<'a>{
-    script: &'a str,
-    messages: JsonMessages
-}
 
 struct Location {
     location: String,
@@ -107,7 +82,6 @@ struct Asset {
     code: String,
     owner: Option<Owner>,
     title: String,
-    category: String,
     properties: HashMap<String, Option<String>>,
     location: Location
 }
@@ -152,21 +126,11 @@ fn main(){
                 name: "John Doe".to_string()
             }),
             title: "Asset 1234".to_string(),
-            category: "Category".to_string(),
             properties: HashMap::new(),
             location: Location{
                 location: "Room 123".to_string(),
                 address: Some("1234 Main St".to_string())
             }
-        }
-    }.to_string());
-    println!("{}", Index{
-        script: "alert('Hello, world!')",
-        messages: JsonMessages{
-            messages: serde_json::json!({
-                "greeting": "Hello, world!",
-                "farewell": "Goodbye, world!"
-            })
         }
     }.to_string());
     println!("{}", ChecklistEmail{

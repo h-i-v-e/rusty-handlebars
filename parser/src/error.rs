@@ -1,8 +1,9 @@
 use std::{error::Error, fmt::Display};
+use crate::expression::Expression;
 
 #[derive(Debug)]
 pub struct ParseError{
-    message: String
+    pub(crate) message: String
 }
 
 pub(crate) fn rcap<'a>(src: &'a str) -> &'a str{
@@ -16,14 +17,16 @@ pub(crate) fn rcap<'a>(src: &'a str) -> &'a str{
 }
 
 impl ParseError{
-    pub(crate) fn new(message: String) -> Self{
+    pub(crate) fn new(message: &str, expression: &Expression<'_>) -> Self{
         Self{
-            message
+            message: format!("{} near \"{}\"", message, expression.around())
         }
     }
 
-    pub fn unclosed(preffix: &str) -> Self{
-        Self::new(format!("Unclosed block near {}", rcap(preffix)))
+    pub(crate) fn unclosed(preffix: &str) -> Self{
+        Self{
+            message: format!("unclosed block near {}", rcap(preffix))
+        }
     }
 }
 
@@ -35,21 +38,10 @@ impl Display for ParseError{
 
 impl From<std::io::Error> for ParseError{
     fn from(err: std::io::Error) -> Self {
-        Self::new(err.to_string())
+        Self{ message: err.to_string()}
     }
 }
 
 impl Error for ParseError{}
 
 pub type Result<T> = std::result::Result<T, ParseError>;
-
-macro_rules! parse_error_near{
-    ($near:ident, $pattern:literal,$($rest:ident,)*) => {
-        Err(ParseError::new(format!(concat!($pattern, " near {}"), $($arg)*rcap($near))))
-    };
-    ($near:ident, $pattern:literal) => {
-        Err(ParseError::new(format!(concat!($pattern, " near {}"), rcap($near))))
-    };
-}
-
-pub(crate) use parse_error_near;

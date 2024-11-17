@@ -8,7 +8,7 @@ members = [
 ]
 
 [workspace.dependencies]
-regex = "1.5.5"
+regex = "1.11.1"
 minify-html = "0.15.0"
 
 [package]
@@ -17,11 +17,9 @@ version = "0.1.7"
 edition = "2021"
 
 [dependencies]
-rusty-handlebars-derive = { path = "derive", version = "0.1.7", optional = true }
+rusty-handlebars-derive = { path = "derive", version = "0.1.7"}
 rusty-handlebars-parser = { path = "parser", version = "0.1.7", optional = true }
 
 [features]
 parser = ["dep:rusty-handlebars-parser"]
-derive = ["dep:rusty-handlebars-derive"]
 minify-html = ["rusty-handlebars-parser?/minify-html"]
-default = ["parser"]

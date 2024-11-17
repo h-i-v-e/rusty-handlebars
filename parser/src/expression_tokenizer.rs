@@ -1,32 +1,33 @@
-use crate::error::{Result, ParseError, rcap, parse_error_near};
+use crate::error::{rcap, ParseError, Result};
 
 #[derive(Clone)]
-pub enum TokenType{
-    SubExpression,
-    Manipulator,
+pub enum TokenType<'a>{
+    SubExpression(&'a str),
+    PrivateVariable,
     Literal
 }
 
 #[derive(Clone)]
-pub(crate) struct Token<'a>{
-    pub token_type: TokenType,
+pub struct Token<'a>{
+    pub token_type: TokenType<'a>,
     pub value: &'a str,
-    tail: &'a str
+    pub tail: &'a str
 }
 
 fn find_closing(src: &str) -> Result<usize>{
     let mut count = 1;
-    for (i, c) in src.char_indices(){
+    let rest = &src[1..];
+    for (i, c) in rest.char_indices(){
         match c{
             '(' => count += 1,
             ')' => count -= 1,
             _ => ()
         }
         if count == 0{
-            return Ok(i);
+            return Ok(i + 1);
         }
     }
-    parse_error_near!(src, "unmatched bracket")
+    Err(ParseError{ message: format!("unmatched brackets near {}", rcap(src))})
 }
 
 fn find_end(src: &str) -> usize{
@@ -40,17 +41,20 @@ fn find_end(src: &str) -> usize{
 
 fn parse<'a>(src: &'a str) -> Result<Option<Token<'a>>>{
     Ok(match src.chars().next(){
-        Some('@' | '&' | '*') => Some(Token{
-            token_type: TokenType::Manipulator,
-            value: &src[..1],
-            tail: &src[1..].trim_start()
-        }),
-        Some('(') => {
-            let end = find_closing(&src[1 ..])?;
+        Some('@') => {
+            let end = find_end(src);
             Some(Token{
-                token_type: TokenType::SubExpression,
-                value: &src[1..end + 1],
-                tail: &src[end + 2..].trim_start()
+                token_type: TokenType::PrivateVariable,
+                value: &src[1..end],
+                tail: &src[end..].trim_start()
+            })
+        },
+        Some('(') => {
+            let end = find_closing(&src)?;
+            Some(Token{
+                token_type: TokenType::SubExpression(&src[..end]),
+                value: &src[1..end],
+                tail: &src[end + 1..].trim_start()
             })
         },
         None => None,
