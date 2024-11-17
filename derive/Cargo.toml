@@ -13,6 +13,7 @@ quote = "1.0.15"
 regex.workspace = true
 rusty-handlebars-parser = {path = "../parser"}
 syn = {version = "^2.0.0", features = ["full"]}
+toml = "0.8.19"
 
 [features]
 minify-html = ["dep:minify-html", "rusty-handlebars-parser/minify-html"]

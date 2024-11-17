@@ -3,10 +3,34 @@ use regex::Regex;
 use rusty_handlebars_parser::{add_builtins, build_helper, BlockMap, Compiler, Options, USE_AS_DISPLAY};
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
+use std::env;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use syn::parse::{Parse, ParseStream};
 use syn::{parse_macro_input, DeriveInput, Ident, Result, LitStr, Token};
 use syn::spanned::Spanned;
+use toml::Value;
+
+fn find_path() -> PathBuf{
+    let path = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap()).to_path_buf();
+    let workspace = match path.parent(){
+        None => return path,
+        Some(parent) => parent.to_path_buf()
+    };
+    let cargo = workspace.join("Cargo.toml");
+    if !cargo.exists(){
+        return path;
+    }
+    let contents = std::fs::read_to_string(&cargo).map(|contents| Value::from_str(&contents).unwrap()).unwrap();
+    let name = path.file_name().unwrap().to_str().unwrap();
+    match match contents.get("workspace").and_then(|workspace| workspace.get("members")).and_then(|members| members.as_array()){
+        None => return path,
+        Some(members) => members.iter().find(|item| item.as_str().unwrap() == name)
+    }{
+        None => path,
+        Some(_) => workspace
+    }
+}
 
 struct TemplateArgs{
     src: Option<String>
@@ -64,19 +88,18 @@ impl Parse for DisplayParts{
             ),
             Some(src) => src
         };
-        let buf = match std::fs::read_to_string(&src) {
+        let path = find_path().join(src);
+        println!("reading {:?}", path);
+        let buf = match std::fs::read_to_string(&path){
             Ok(src) => src,
-            Err(err) => {
-                let path = std::fs::canonicalize(std::path::Path::new("./")).unwrap();
-                return Err(
-                    syn::Error::new(
-                        attr.span(),
-                        format!(
-                            "unable to read {}, {}", path.join(src).to_str().unwrap(), err.to_string()
-                        )
+            Err(err) => return Err(
+                syn::Error::new(
+                    attr.span(),
+                    format!(
+                        "unable to read {:?}, {}", path, err.to_string()
                     )
                 )
-            }
+            )
         };
         #[cfg(feature = "minify-html")]
         let buf = minify(buf.as_bytes(), &build_helper::COMPRESS_CONFIG);
