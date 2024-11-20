@@ -13,22 +13,32 @@ use toml::Value;
 
 fn find_path() -> PathBuf{
     let path = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap()).to_path_buf();
-    let workspace = match path.parent(){
-        None => return path,
-        Some(parent) => parent.to_path_buf()
-    };
-    let cargo = workspace.join("Cargo.toml");
-    if !cargo.exists(){
-        return path;
-    }
-    let contents = std::fs::read_to_string(&cargo).map(|contents| Value::from_str(&contents).unwrap()).unwrap();
-    let name = path.file_name().unwrap().to_str().unwrap();
-    match match contents.get("workspace").and_then(|workspace| workspace.get("members")).and_then(|members| members.as_array()){
-        None => return path,
-        Some(members) => members.iter().find(|item| item.as_str().unwrap() == name)
-    }{
-        None => path,
-        Some(_) => workspace
+    let mut name = path.file_name().unwrap().to_str().unwrap().to_string();
+    let mut local = path.clone();
+    loop{  
+        let workspace = match local.parent(){
+            None => return path,
+            Some(parent) => parent.to_path_buf()
+        };
+        //println!("workspace {:?}", workspace);
+        let cargo = workspace.join("Cargo.toml");
+        if cargo.exists(){
+            let contents = std::fs::read_to_string(&cargo).map(|contents| Value::from_str(&contents).unwrap()).unwrap();
+            if let Some(members) = contents.get("workspace")
+            .and_then(|workspace| workspace.get("members"))
+            .and_then(|members| members.as_array()){
+                //println!("searching for {} in members {:?}", name, members);
+                if members.iter().find(|item| item.as_str().unwrap() == name).is_some(){
+                    return workspace;
+                }
+            }
+        }
+        name = match workspace.file_name(){
+            None => return path,
+            Some(base) => format!("{}/{}", base.to_str().unwrap(), name)
+        };
+        local = workspace;
+        continue;
     }
 }
 
@@ -89,7 +99,7 @@ impl Parse for DisplayParts{
             Some(src) => src
         };
         let path = find_path().join(src);
-        println!("reading {:?}", path);
+        //println!("reading {:?}", path);
         let buf = match std::fs::read_to_string(&path){
             Ok(src) => src,
             Err(err) => return Err(
