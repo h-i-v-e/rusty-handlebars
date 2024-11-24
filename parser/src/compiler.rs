@@ -22,6 +22,7 @@ pub struct Rust{
 
 pub static USE_AS_DISPLAY: &str = "AsDisplay";
 pub static USE_AS_DISPLAY_HTML: &str = "AsDisplayHtml";
+
 pub struct Uses<'a>{
     uses: &'a HashSet<&'static str>
 }
@@ -313,9 +314,7 @@ impl<'a> Compile<'a>{
 #[derive(Clone, Copy)]
 pub struct Options{
     pub root_var_name: Option<&'static str>,
-    pub write_var_name: &'static str,
-    #[cfg(feature = "minify_html")]
-    pub minify_cfg: Option<Cfg>
+    pub write_var_name: &'static str
 }
 
 pub struct Compiler{
