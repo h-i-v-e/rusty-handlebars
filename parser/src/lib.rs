@@ -1,6 +1,3 @@
-#[cfg(feature = "minify_html")]
-use minify_html::Cfg;
-
 mod error;
 mod expression;
 mod expression_tokenizer;
