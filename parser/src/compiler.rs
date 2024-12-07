@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::{HashMap, HashSet}, fmt::{Display, Write}};
 
 use regex::{Captures, Regex};
 
-use crate::{error::{ParseError, Result}, expression::{Expression, ExpressionType}, expression_tokenizer::{Token, TokenType}, optimizer::optimize};
+use crate::{error::{ParseError, Result}, expression::{Expression, ExpressionType}, expression_tokenizer::{Token, TokenType}/* , optimizer::optimize*/};
 
 pub enum Local{
     As(String),
@@ -13,6 +13,11 @@ pub enum Local{
 pub struct Scope{
     pub opened: Box<dyn Block>,
     pub depth: usize
+}
+
+enum PendingWrite<'a>{
+    Raw(&'a str),
+    Expression((Expression<'a>, &'static str, &'static str))
 }
 
 pub struct Rust{
@@ -223,6 +228,13 @@ impl<'a> Compile<'a>{
         }
     }
 
+    fn handle_else(&self, expression: &Expression<'a>, rust: &mut Rust) -> Result<()>{
+        match self.open_stack.last() {
+            Some(scope) => scope.opened.handle_else(expression, rust),
+            None => Err(ParseError::new("else not expected here", expression))
+        }
+    }
+
     fn resolve(&self, expression: &Expression<'a>, rust: &mut Rust) -> Result<()>{
         let token = match Token::first(&expression.content)?{
             Some(token) => token,
@@ -235,10 +247,6 @@ impl<'a> Compile<'a>{
             return Ok(())
         }
         match token.value{
-            "else" => match self.open_stack.last() {
-                Some(scope) => scope.opened.handle_else(&expression, rust),
-                None => Err(ParseError::new("else not expected here", &expression))
-            },
             "lookup" => {
                 rust.code.push_str(expression.prefix);
                 match token.next()?{
@@ -274,7 +282,7 @@ impl<'a> Compile<'a>{
                     };
                     glue = ',';
                 }
-                if glue != '('{
+                if glue == ','{
                     rust.code.push(')');
                 }
                 rust.code.push_str(expression.postfix);
@@ -341,35 +349,41 @@ impl Compiler {
         )
     }
 
-    fn push_write(&self, rust: &mut String){
-        rust.push_str("write!(");
-        rust.push_str(self.options.write_var_name);
-    }
-
-    fn write_str(&self, rust: &mut String, content: &str) {
-        if content.is_empty(){
-            return;
+    fn commit_pending<'a>(&self, pending: &mut Vec<PendingWrite<'a>>, compile: &mut Compile<'a>, rust: &mut Rust) -> Result<()>{
+        if pending.is_empty(){
+            return Ok(());
         }
-        self.push_write(rust);
-        rust.push_str(", \"");
-        rust.push_str(self.escape(content).as_ref());
-        rust.push_str("\")?;");
-    }
-
-    fn write_resolve<'a>(&self, compile: &mut Compile<'a>, rust: &mut Rust, expression: &Expression<'a>, display: &str, uses: &'static str) -> Result<()> {
-        rust.using.insert(uses);
-        compile.resolve(&Expression{
-            expression_type: ExpressionType::Raw,
-            prefix: &format!("write!({}, \"{{}}\", ", self.options.write_var_name),
-            content: expression.content,
-            postfix: display,
-            raw: expression.raw
-        }, rust)
+        rust.code.push_str("write!(");
+        rust.code.push_str(self.options.write_var_name);
+        rust.code.push_str(", \"");
+        for pending in pending.iter(){
+            match pending{
+                PendingWrite::Raw(raw) => rust.code.push_str(self.escape(raw).as_ref()),
+                PendingWrite::Expression(_) => rust.code.push_str("{}")
+            }
+        }
+        rust.code.push('"');
+        for pending in pending.iter(){
+            if let PendingWrite::Expression((expression, uses, display)) = pending{
+                compile.resolve(&Expression{
+                    expression_type: ExpressionType::Raw,
+                    prefix: ", ",
+                    content: expression.content,
+                    postfix: display,
+                    raw: expression.raw
+                }, rust)?;
+                rust.using.insert(uses);
+            }
+        }
+        rust.code.push_str(")?;");
+        pending.clear();
+        Ok(())
     }
 
     pub fn compile(&self, src: &str) -> Result<Rust>{
         let mut compile = Compile::new(self.options.root_var_name, &self.block_map);
         let mut rust = Rust::new();
+        let mut pending: Vec<PendingWrite> = Vec::new();
         let mut rest = src;
         let mut expression = Expression::from(src)?;
         while let Some(expr) = expression{
@@ -380,20 +394,35 @@ impl Compiler {
                 postfix,
                 raw: _
             } = &expr;
-            rest = postfix;
-            self.write_str(&mut rust.code, prefix);
+            rest = postfix; 
+            if !prefix.is_empty(){
+                pending.push(PendingWrite::Raw(prefix));
+            }
             match expression_type{
-                ExpressionType::Raw => self.write_resolve(&mut compile, &mut rust, &expr, ".as_display())?;", USE_AS_DISPLAY)?,
-                ExpressionType::HtmlEscaped => self.write_resolve(&mut compile, &mut rust, &expr, ".as_display_html())?;", USE_AS_DISPLAY_HTML)?,
-                ExpressionType::Open => compile.open(expr, &mut rust)?,
-                ExpressionType::Close => compile.close(expr, &mut rust)?,
-                ExpressionType::Escaped => self.write_str(&mut rust.code, content),
+                ExpressionType::Raw => pending.push(PendingWrite::Expression((expr.clone(), USE_AS_DISPLAY, ".as_display()"))),
+                ExpressionType::HtmlEscaped => if *content == "else" {
+                    self.commit_pending(&mut pending, &mut compile, &mut rust)?;
+                    compile.handle_else(&expr, &mut rust)?
+                } else {
+                    pending.push(PendingWrite::Expression((expr.clone(), USE_AS_DISPLAY_HTML, ".as_display_html()")))
+                },
+                ExpressionType::Open => {
+                    self.commit_pending(&mut pending, &mut compile, &mut rust)?;
+                    compile.open(expr, &mut rust)?
+                },
+                ExpressionType::Close => {
+                    self.commit_pending(&mut pending, &mut compile, &mut rust)?;
+                    compile.close(expr, &mut rust)?
+                },
+                ExpressionType::Escaped => pending.push(PendingWrite::Raw(content)),
                 _ => ()
             };
             expression = expr.next()?;
         }
-        self.write_str(&mut rust.code, rest);
-        rust.code = optimize(rust.code, self.options.write_var_name);
+        if !rest.is_empty(){
+            pending.push(PendingWrite::Raw(rest));
+        }
+        self.commit_pending(&mut pending, &mut compile, &mut rust)?;
         Ok(rust)
     }
 }

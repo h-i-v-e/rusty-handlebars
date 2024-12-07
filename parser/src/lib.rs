@@ -1,7 +1,7 @@
 mod error;
 mod expression;
 mod expression_tokenizer;
-mod optimizer;
+//mod optimizer;
 mod compiler;
 mod block;
 pub mod build_helper;
