@@ -32,9 +32,9 @@ impl IfOrUnless{
     pub fn new<'a>(label: &str, prefix: &str, compile: &'a Compile<'a>, token: Token<'a>, expression: &'a Expression<'a>, rust: &mut Rust) -> Result<IfOrUnless>{
         match token.next()? {
             Some(var) => {
-                rust.using.insert("AsBool");
+                rust.using.insert("AsBool".to_string());
                 rust.code.push_str(prefix);
-                compile.write_var(expression, rust, var)?;
+                compile.write_var(expression, rust, &var)?;
                 rust.code.push_str(".as_bool(){");
                 Ok(Self{})
             },
@@ -82,7 +82,7 @@ impl IfSome{
         if by_ref{
             rust.code.push('&');
         }
-        compile.write_var(expression, rust, next)?;
+        compile.write_var(expression, rust, &next)?;
         rust.code.push('{');
         Ok(Self{local})
     }
@@ -131,7 +131,7 @@ impl With{
         if by_ref{
             rust.code.push('&');
         }
-        compile.write_var(expression, rust, next)?;
+        compile.write_var(expression, rust, &next)?;
         rust.code.push(';');
         Ok(Self{local})
     }
@@ -259,7 +259,7 @@ impl Each{
         if by_ref{
             rust.code.push('&');
         }
-        compile.write_var(expression, rust, next)?;
+        compile.write_var(expression, rust, &next)?;
         rust.code.push('{');
         if has_else{
             rust.code.push_str("empty = false;");

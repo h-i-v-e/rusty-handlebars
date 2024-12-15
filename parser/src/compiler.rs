@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::{HashMap, HashSet}, fmt::{Display, Write}};
 
 use regex::{Captures, Regex};
 
-use crate::{error::{ParseError, Result}, expression::{Expression, ExpressionType}, expression_tokenizer::{Token, TokenType}/* , optimizer::optimize*/};
+use crate::{error::{ParseError, Result}, expression::{Expression, ExpressionType}, expression_tokenizer::{Token, TokenType}};
 
 pub enum Local{
     As(String),
@@ -21,7 +21,7 @@ enum PendingWrite<'a>{
 }
 
 pub struct Rust{
-    pub using: HashSet<&'static str>,
+    pub using: HashSet<String>,
     pub code: String
 }
 
@@ -29,7 +29,7 @@ pub static USE_AS_DISPLAY: &str = "AsDisplay";
 pub static USE_AS_DISPLAY_HTML: &str = "AsDisplayHtml";
 
 pub struct Uses<'a>{
-    uses: &'a HashSet<&'static str>
+    uses: &'a HashSet<String>
 }
 
 impl<'a> Display for Uses<'a>{
@@ -202,30 +202,28 @@ impl<'a> Compile<'a>{
     fn resolve_sub_expression(&self, raw: &str, value: &str, rust: &mut Rust) -> Result<()>{
         self.resolve(&Expression { 
             expression_type: ExpressionType::Raw,
-            prefix: "(",
+            prefix: "",
             content: value,
-            postfix: ")", 
+            postfix: "", 
             raw
         }, rust)
     }
 
-    pub fn write_var(&self, expression: &Expression<'a>, rust: &mut Rust, var: Token<'a>) -> Result<Option<Token<'a>>>{
+    pub fn write_var(&self, expression: &Expression<'a>, rust: &mut Rust, var: &Token<'a>) -> Result<()>{
         match var.token_type{
             TokenType::PrivateVariable => {
                 let (name, scope) = self.find_scope(var.value)?;
                 scope.opened.resolve_private(scope.depth, expression, name, rust)?;
-                Ok(Some(var))
             },
             TokenType::Literal => {
                 let (name, scope) = self.find_scope(var.value)?;
                 self.resolve_var(name, scope, &mut rust.code)?;
-                Ok(Some(var))
             },
             TokenType::SubExpression(raw) => {
                 self.resolve_sub_expression(raw, var.value, rust)?;
-                Ok(Some(var))
             }
         }
+        Ok(())
     }
 
     fn handle_else(&self, expression: &Expression<'a>, rust: &mut Rust) -> Result<()>{
@@ -235,60 +233,58 @@ impl<'a> Compile<'a>{
         }
     }
 
+    fn resolve_lookup(&self, expression: &Expression<'a>, prefix: &str, postfix: char, args: Token<'a>, rust: &mut Rust) -> Result<()>{
+        self.write_var(expression, rust, &args)?;
+        rust.code.push_str(prefix);
+        self.write_var(expression, rust, &args.next()?.ok_or(
+            ParseError::new("lookup expects 2 arguments", &expression))?
+        )?;
+        rust.code.push(postfix);
+        Ok(())
+    }
+
+    fn resolve_helper(&self, expression: &Expression<'a>, name: Token<'a>, mut args: Token<'a>, rust: &mut Rust) -> Result<()>{
+        match name.value{
+            "lookup" => self.resolve_lookup(expression, "[", ']', args, rust),
+            "try_lookup" => self.resolve_lookup(expression, ".get(", ')', args, rust),
+            name => {
+                rust.code.push_str(name);
+                rust.code.push('(');
+                self.write_var(expression, rust, &args)?;
+                loop {
+                    args = match args.next()?{
+                        Some(token) => {
+                            rust.code.push_str(", ");
+                            self.write_var(expression, rust, &token)?;
+                            token
+                        },
+                        None => {
+                            rust.code.push(')');
+                            return Ok(());
+                        }
+                    };
+                }
+            }
+        }
+    }
+
     fn resolve(&self, expression: &Expression<'a>, rust: &mut Rust) -> Result<()>{
         let token = match Token::first(&expression.content)?{
             Some(token) => token,
             None => return Err(ParseError::new("expected token", &expression))
         };
+        rust.code.push_str(expression.prefix);
         if let TokenType::SubExpression(raw) = token.token_type{
-            rust.code.push_str(expression.prefix);
             self.resolve_sub_expression(raw, token.value, rust)?;
-            rust.code.push_str(expression.postfix);
-            return Ok(())
         }
-        match token.value{
-            "lookup" => {
-                rust.code.push_str(expression.prefix);
-                match token.next()?{
-                    Some(token) => {
-                        let index = match match self.write_var(expression, rust, token)?{
-                            Some(token) => token.next()?,
-                            None => None
-                        }{
-                            Some(token) => token,
-                            None => return Err(ParseError::new("lookup expects 2 arguments", &expression))
-                        };
-                        rust.code.push_str(".get(");
-                        self.write_var(expression, rust, index)?;
-                        rust.code.push(')');
-                        rust.code.push_str(expression.postfix);
-                        Ok(())
-                    },
-                    None => Err(ParseError::new("calling lookup without argments", &expression))
-                }
-            },
-            _ => {
-                rust.code.push_str(expression.prefix);
-                let mut next = match self.write_var(expression, rust, token)?{
-                    Some(token) => token.next()?,
-                    None => None
-                };
-                let mut glue = '(';
-                while let Some(token) = next{
-                    rust.code.push(glue);
-                    next = match self.write_var(expression, rust, token)?{
-                        Some(token) => token.next()?,
-                        None => None
-                    };
-                    glue = ',';
-                }
-                if glue == ','{
-                    rust.code.push(')');
-                }
-                rust.code.push_str(expression.postfix);
-                Ok(())
-            }
+        else if let Some(args) = token.next()?{
+            self.resolve_helper(expression, token, args, rust)?;
         }
+        else{
+            self.write_var(expression, rust, &token)?;
+        }
+        rust.code.push_str(expression.postfix);
+        Ok(())
     }
 
 
@@ -300,7 +296,7 @@ impl<'a> Compile<'a>{
     }
 
     fn close(&mut self, expression: Expression<'a>, rust: &mut Rust) -> Result<()>{
-        let scope = self.open_stack.pop().ok_or_else(|| ParseError::new("Mismatched block", &expression))?;
+        let scope = self.open_stack.pop().ok_or_else(|| ParseError::new("Mismatched block helper", &expression))?;
         Ok(scope.opened.handle_close(rust))
     }
 
@@ -314,7 +310,7 @@ impl<'a> Compile<'a>{
                 });
                 Ok(())
             },
-            None => Err(ParseError::new(&format!("unsupported helper {}", token.value), &expression))
+            None => Err(ParseError::new(&format!("unsupported block helper {}", token.value), &expression))
         }
     }
 }
@@ -372,7 +368,7 @@ impl Compiler {
                     postfix: display,
                     raw: expression.raw
                 }, rust)?;
-                rust.using.insert(uses);
+                rust.using.insert(uses.to_string());
             }
         }
         rust.code.push_str(")?;");

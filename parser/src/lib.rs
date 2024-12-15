@@ -107,19 +107,19 @@ mod tests {
     #[test]
     fn test_indexer(){
         let rust = compile("{{#each things}}Hello{{{@index}}}{{#each things}}{{{lookup other @../index}}}{{{@index}}}{{/each}}{{/each}}");
-        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{write!(f, \"Hello{}\", i_1.as_display())?;let mut i_2 = 0;for this_2 in this_1.things{write!(f, \"{}{}\", this_2.other.get(i_1).as_display(), i_2.as_display())?;i_2 += 1;}i_1 += 1;}");
+        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{write!(f, \"Hello{}\", i_1.as_display())?;let mut i_2 = 0;for this_2 in this_1.things{write!(f, \"{}{}\", this_2.other[i_1].as_display(), i_2.as_display())?;i_2 += 1;}i_1 += 1;}");
     }
 
     #[test]
     fn test_map(){
-        let rust = compile("{{#each things}}Hello{{{@key}}}{{#each @value}}{{{lookup other @../key}}}{{{@value}}}{{/each}}{{/each}}");
-        assert_eq!(rust, "for this_1 in self.things{write!(f, \"Hello{}\", this_1.0.as_display())?;for this_2 in this_1.1{write!(f, \"{}{}\", this_2.other.get(this_1.0).as_display(), this_2.1.as_display())?;}}");
+        let rust = compile("{{#each things}}Hello{{{@key}}}{{#each @value}}{{#if_some (try_lookup other @../key)}}{{{this}}}{{/if_some}}{{{@value}}}{{/each}}{{/each}}");
+        assert_eq!(rust, "for this_1 in self.things{write!(f, \"Hello{}\", this_1.0.as_display())?;for this_2 in this_1.1{if let Some(this_3) = this_2.other.get(this_1.0){write!(f, \"{}\", this_3.as_display())?;}write!(f, \"{}\", this_2.1.as_display())?;}}");
     }
 
     #[test]
     fn test_subexpression(){
         let rust = compile("{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}");
-        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{{let other_2 = (self.other.get(i_1));write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1 += 1;}");
+        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{{let other_2 = self.other[i_1];write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1 += 1;}");
     }
 
     #[test]
@@ -129,7 +129,7 @@ mod tests {
             write_var_name: "f"
         }, make_map()).compile("{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}").unwrap();
         assert_eq!(rust.uses().to_string(), "use rusty_handlebars::AsDisplay");
-        assert_eq!(rust.code, "let mut i_1 = 0;for this_1 in things{{let other_2 = (other.get(i_1));write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1 += 1;}");
+        assert_eq!(rust.code, "let mut i_1 = 0;for this_1 in things{{let other_2 = other[i_1];write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1 += 1;}");
     }
 
     #[test]

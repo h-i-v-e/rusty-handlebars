@@ -7,7 +7,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use syn::parse::{Parse, ParseStream};
-use syn::{parse_macro_input, DeriveInput, Ident, Result, LitStr, Token};
+use syn::{parse_macro_input, DeriveInput, Ident, LitBool, LitStr, Result, Token};
 use syn::spanned::Spanned;
 use toml::Value;
 
@@ -43,18 +43,38 @@ fn find_path() -> PathBuf{
 }
 
 struct TemplateArgs{
-    src: Option<String>
+    src: Option<String>,
+    helpers: Vec<String>,
+    minify: bool
+}
+
+fn parse_helpers(input: ParseStream, helpers: &mut Vec<String>) -> Result<()>{
+    input.parse::<proc_macro2::Group>()?.stream().into_iter().for_each(|item| {
+        let helper = item.to_string();
+        helpers.push(helper[1..helper.len() - 1].to_string());
+    });
+    Ok(())
 }
 
 impl Parse for TemplateArgs{
     fn parse(input: ParseStream) -> Result<Self> {
         let mut src : Option<String> = None;
+        let mut minify = true;
+        let mut helpers = Vec::<String>::new();
         loop {
             let ident = input.parse::<Ident>()?;
             let label = ident.to_string();
             input.parse::<Token!(=)>()?;
-            if label == "path"{
-                src = Some(input.parse::<LitStr>()?.value());
+            match label.as_str(){
+                "minify" => minify = input.parse::<LitBool>()?.value(),
+                "path" => src = Some(input.parse::<LitStr>()?.value()),
+                "helpers" => parse_helpers(input, &mut helpers)?,
+                _ => return Err(
+                    syn::Error::new(
+                        ident.span(),
+                        format!("unknown attribute {}", label)
+                    )
+                )
             }
             if input.is_empty(){
                 break;
@@ -62,7 +82,7 @@ impl Parse for TemplateArgs{
             input.parse::<Token!(,)>()?;
         }
         Ok(TemplateArgs{
-            src
+            src, helpers, minify
         })
     }
 }
@@ -100,7 +120,7 @@ impl Parse for DisplayParts{
         };
         let path = find_path().join(src);
         //println!("reading {:?}", path);
-        let buf = match std::fs::read_to_string(&path){
+        let mut buf = match std::fs::read_to_string(&path){
             Ok(src) => src,
             Err(err) => return Err(
                 syn::Error::new(
@@ -112,19 +132,17 @@ impl Parse for DisplayParts{
             )
         };
         #[cfg(feature = "minify-html")]
-        let buf = minify(buf.as_bytes(), &build_helper::COMPRESS_CONFIG);
-        #[cfg(feature = "minify-html")]   
-        let src = unsafe{
-            std::str::from_utf8_unchecked(&buf)
-        };
-        #[cfg(not(feature = "minify-html"))]
-        let src = buf.as_str();
+        if args.minify{
+            unsafe {
+                buf = String::from_utf8_unchecked(minify(buf.as_bytes(), &build_helper::COMPRESS_CONFIG));
+            }
+        }
         let mut factories = BlockMap::new();
         add_builtins(&mut factories);
         let mut rust = match Compiler::new(Options{
             write_var_name: "f",
             root_var_name: Some("self")
-        }, factories).compile(&src){
+        }, factories).compile(&buf){
             Ok(rust) => rust,
             Err(err) => {
                 return Err(
@@ -135,8 +153,11 @@ impl Parse for DisplayParts{
                 )
             }
         };
-        rust.using.insert("WithRustyHandlebars");
-        rust.using.insert(USE_AS_DISPLAY);
+        rust.using.insert("WithRustyHandlebars".to_string());
+        rust.using.insert(USE_AS_DISPLAY.to_string());
+        for helper in args.helpers{
+            rust.using.insert(helper);
+        }
         Ok(Self{
             name, generics: lifetimes,
             uses: proc_macro2::token_stream::TokenStream::from_str(&rust.uses().to_string())?,
