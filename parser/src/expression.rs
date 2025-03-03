@@ -16,6 +16,15 @@ pub struct Expression<'a>{
     pub raw: &'a str
 }
 
+#[inline]
+fn nibble(src: &str, start: usize, len: usize) -> Result<usize>{
+    let end = start + len; 
+    if end >= src.len(){
+        return Err(ParseError::unclosed(src));
+    }
+    Ok(end)
+}
+
 impl<'a> Expression<'a>{
     fn close(expression_type: ExpressionType, preffix: &'a str, start: &'a str, end: &'static str) -> Result<Self>{
         match start.find(end){
@@ -46,10 +55,7 @@ impl<'a> Expression<'a>{
     pub fn from(src: &'a str) -> Result<Option<Self>>{
         match src.find("{{"){
             Some(start) => {
-                let mut second = start + 3;
-                if second >= src.len(){
-                    return Err(ParseError::unclosed(src));
-                }
+                let mut second = nibble(src, start, 3)?;
                 if start > 0 && &src[start - 1 .. start] == "\\"{
                     return Ok(Some(Self::close(ExpressionType::Escaped, &src[.. start - 1], &src[second - 1 ..], "}}")?));
                 }
@@ -57,19 +63,23 @@ impl<'a> Expression<'a>{
                 let mut marker = &src[start + 2 .. second];
                 if marker == "~"{
                     prefix = prefix.trim_end();
-                    second += 1;
-                    if second >= src.len(){
-                        return Err(ParseError::unclosed(src));
-                    }
+                    second = nibble(src, second, 1)?;
                     marker = &src[start + 3 .. second];
                 }
                 Ok(Some(match marker{
                     "{" => {
-                        let next = second + 1;
-                        if next >= src.len(){
-                            return Err(ParseError::unclosed(src));
+                        let next = nibble(src, second, 1)?;
+                        let char = &src[second .. next];
+                        if char == "{"{
+                            second = next;
+                            let next = nibble(src, second, 1)?;
+                            if &src[second .. next] == "~"{
+                                second = next;
+                                prefix = prefix.trim_end();
+                            }
+                            return Ok(Some(Self::close(ExpressionType::Escaped, prefix, &src[second ..], "}}}}")?))
                         }
-                        if &src[second .. next] == "~"{
+                        if char == "~"{
                             second = next;
                             prefix = prefix.trim_end();
                         }

@@ -144,4 +144,10 @@ mod tests {
         let rust = compile("{{#if_some some}}Hello {{name}}{{else}}Oh dear{{/if_some}}{{#if some}}{{#if_some_ref ../some as |other|}}Hello {{other.name}}{{/if_some}}{{/if}}");
         assert_eq!(rust, "if let Some(this_1) = self.some{write!(f, \"Hello {}\", this_1.name.as_display_html())?;}else{write!(f, \"Oh dear\")?;}if self.some.as_bool(){if let Some(other_2) = &self.some{write!(f, \"Hello {}\", other_2.name.as_display_html())?;}}");
     }
+
+    #[test]
+    fn test_escaped(){
+        let rust = compile("{{{{name}}}}");
+        assert_eq!(rust, "write!(f, \"name\")?;");
+    }
 }

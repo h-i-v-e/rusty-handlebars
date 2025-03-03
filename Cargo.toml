@@ -11,12 +11,12 @@ minify-html = "0.15.0"
 
 [package]
 name = "rusty-handlebars"
-version = "0.1.9"
+version = "0.1.10"
 edition = "2021"
 
 [dependencies]
-rusty-handlebars-derive = { path = "derive", version = "0.1.9"}
-rusty-handlebars-parser = { path = "parser", version = "0.1.9", optional = true }
+rusty-handlebars-derive = { path = "derive", version = "0.1.10"}
+rusty-handlebars-parser = { path = "parser", version = "0.1.10", optional = true }
 
 [features]
 parser = ["dep:rusty-handlebars-parser"]
