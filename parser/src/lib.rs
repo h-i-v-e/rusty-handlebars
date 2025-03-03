@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_escaped(){
-        let rust = compile("{{{{name}}}}");
-        assert_eq!(rust, "write!(f, \"name\")?;");
+        let rust = compile("{{{{skip}}}}wang doodle {{{{/dandy}}}}{{{{/skip}}}}");
+        assert_eq!(rust, "write!(f, \"wang doodle {{{{{{{{/dandy}}}}}}}}\")?;");
     }
 }

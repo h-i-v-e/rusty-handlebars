@@ -52,6 +52,29 @@ impl<'a> Expression<'a>{
         Self::close(ExpressionType::Comment, preffix, start, "}}")
     }
 
+    fn find_closing_escape(open: Expression<'a>) -> Result<Self>{
+        let mut postfix = open.postfix;
+        let mut from: usize = 0;
+        loop{
+            let candidate = postfix.find("{{{{/").ok_or(ParseError::unclosed(&open.raw))?;
+            let start = candidate + 5;
+            let remains = &postfix[start ..];
+            let close = remains.find("}}}}").ok_or(ParseError::unclosed(&open.raw))?;
+            let end = start + close + 4;
+            if &remains[.. close] == open.content{
+                return Ok(Self{
+                    expression_type: ExpressionType::Escaped,
+                    prefix: open.prefix,
+                    content: &open.postfix[.. from + candidate],
+                    postfix: &postfix[end ..],
+                    raw: open.raw
+                })
+            }
+            from += end;
+            postfix = &postfix[from ..];
+        }
+    }
+
     pub fn from(src: &'a str) -> Result<Option<Self>>{
         match src.find("{{"){
             Some(start) => {
@@ -77,7 +100,7 @@ impl<'a> Expression<'a>{
                                 second = next;
                                 prefix = prefix.trim_end();
                             }
-                            return Ok(Some(Self::close(ExpressionType::Escaped, prefix, &src[second ..], "}}}}")?))
+                            return Ok(Some(Self::find_closing_escape(Self::close(ExpressionType::Escaped, prefix, &src[second ..], "}}}}")?)?));
                         }
                         if char == "~"{
                             second = next;
