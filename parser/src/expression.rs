@@ -1,21 +1,55 @@
+//! Handlebars expression parsing
+//!
+//! This module provides functionality for parsing Handlebars expressions from template strings.
+//! It handles various types of expressions including variables, blocks, comments, and escaped content.
+//!
+//! # Expression Types
+//!
+//! The module supports the following types of expressions:
+//! - Variables: `{{name}}`
+//! - HTML-escaped variables: `{{{name}}}`
+//! - Block helpers: `{{#helper}}...{{/helper}}`
+//! - Comments: `{{! comment }}` or `{{!-- comment --}}`
+//! - Escaped content: `\{{name}}` or `{{{{name}}}}this bit here is not parsed {{not_interpolated}} and output raw{{{{/name}}}}`
+//!
+//! # Examples
+//!
+//! ```rust
+//! use rusty_handlebars_parser::expression::{Expression, ExpressionType};
+//!
+//! let template = "Hello {{name}}!";
+//! let expr = Expression::from(template).unwrap().unwrap();
+//! assert_eq!(expr.expression_type, ExpressionType::HtmlEscaped);
+//! assert_eq!(expr.content, "name");
+//! ```
+
 use std::{cmp::min, fmt::Display};
 
 use crate::error::{Result, ParseError};
 
+/// Types of Handlebars expressions
 #[derive(Debug, Clone, Copy)]
 pub enum ExpressionType{
+    /// Comment expression: `{{! comment }}`
     Comment, HtmlEscaped, Raw, Open, Close, Escaped
 }
 
+/// Represents a parsed Handlebars expression
 #[derive(Debug, Clone, Copy)]
 pub struct Expression<'a>{
+    /// The type of expression
     pub expression_type: ExpressionType,
+    /// Text before the expression
     pub prefix: &'a str,
+    /// The expression content
     pub content: &'a str,
+    /// Text after the expression
     pub postfix: &'a str,
+    /// The complete expression including delimiters
     pub raw: &'a str
 }
 
+/// Safely extracts a substring of specified length
 #[inline]
 fn nibble(src: &str, start: usize, len: usize) -> Result<usize>{
     let end = start + len; 
@@ -26,6 +60,7 @@ fn nibble(src: &str, start: usize, len: usize) -> Result<usize>{
 }
 
 impl<'a> Expression<'a>{
+    /// Creates a new expression by finding its closing delimiter
     fn close(expression_type: ExpressionType, preffix: &'a str, start: &'a str, end: &'static str) -> Result<Self>{
         match start.find(end){
             Some(mut pos) => {
@@ -43,6 +78,7 @@ impl<'a> Expression<'a>{
         }
     }
 
+    /// Parses a comment expression
     fn check_comment(preffix: &'a str, start: &'a str) -> Result<Self>{
         if let Some(pos) = start.find("--"){
             if pos == 0{
@@ -52,6 +88,7 @@ impl<'a> Expression<'a>{
         Self::close(ExpressionType::Comment, preffix, start, "}}")
     }
 
+    /// Finds the closing delimiter for an escaped expression
     fn find_closing_escape(open: Expression<'a>) -> Result<Self>{
         let mut postfix = open.postfix;
         let mut from: usize = 0;
@@ -75,6 +112,7 @@ impl<'a> Expression<'a>{
         }
     }
 
+    /// Parses the next expression from a template string
     pub fn from(src: &'a str) -> Result<Option<Self>>{
         match src.find("{{"){
             Some(start) => {
@@ -118,10 +156,12 @@ impl<'a> Expression<'a>{
         }
     }
 
+    /// Parses the next expression after this one
     pub fn next(&self) -> Result<Option<Self>>{
         Self::from(self.postfix)
     }
 
+    /// Returns a string containing the expression and its surrounding context
     pub fn around(&self) -> &str{
         let len = self.raw.len();
         if len == 0{

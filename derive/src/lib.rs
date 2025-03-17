@@ -1,3 +1,56 @@
+//! Derive macro for Handlebars templating
+//!
+//! This crate provides the derive macro implementation for the `WithRustyHandlebars` trait.
+//! It processes Handlebars templates at compile time and generates the necessary
+//! implementations for template rendering.
+//!
+//! # Usage
+//!
+//! ```rust
+//! use rusty_handlebars::WithRustyHandlebars;
+//!
+//! #[derive(WithRustyHandlebars)]
+//! #[template(path = "templates/hello.hbs")]
+//! struct HelloTemplate {
+//!     name: String,
+//! }
+//! ```
+//!
+//! # Template Attributes
+//!
+//! The `#[template(...)]` attribute supports the following options:
+//!
+//! - `path`: Path to the Handlebars template file (required)
+//! - `minify`: Whether to minify the HTML output (default: true)
+//! - `helpers`: List of custom helper functions to use in the template
+//!
+//! # Example with All Options
+//!
+//! ```rust
+//! use rusty_handlebars::WithRustyHandlebars;
+//!
+//! #[derive(WithRustyHandlebars)]
+//! #[template(
+//!     path = "templates/hello.hbs",
+//!     minify = true,
+//!     helpers = ["format_date", "capitalize"]
+//! )]
+//! struct HelloTemplate {
+//!     name: String,
+//!     date: String,
+//! }
+//! ```
+//!
+//! # Implementation Details
+//!
+//! The derive macro:
+//! 1. Reads and processes the Handlebars template at compile time
+//! 2. Generates a Display implementation for the struct
+//! 3. Implements the WithRustyHandlebars trait
+//! 4. Implements the AsDisplay trait
+//! 5. Optionally minifies the HTML output
+//! 6. Adds support for custom helper functions
+
 use minify_html::minify;
 use regex::Regex;
 use rusty_handlebars_parser::{add_builtins, build_helper, BlockMap, Compiler, Options, USE_AS_DISPLAY};
@@ -11,6 +64,7 @@ use syn::{parse_macro_input, DeriveInput, Ident, LitBool, LitStr, Result, Token}
 use syn::spanned::Spanned;
 use toml::Value;
 
+/// Finds the workspace root path for template resolution
 fn find_path() -> PathBuf{
     let path = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap()).to_path_buf();
     let mut name = path.file_name().unwrap().to_str().unwrap().to_string();
@@ -42,12 +96,17 @@ fn find_path() -> PathBuf{
     }
 }
 
+/// Arguments for the template attribute
 struct TemplateArgs{
+    /// Path to the template file
     src: Option<String>,
+    /// List of custom helper functions
     helpers: Vec<String>,
+    /// Whether to minify the HTML output
     minify: bool
 }
 
+/// Parses helper function names from the attribute
 fn parse_helpers(input: ParseStream, helpers: &mut Vec<String>) -> Result<()>{
     input.parse::<proc_macro2::Group>()?.stream().into_iter().for_each(|item| {
         let helper = item.to_string();
@@ -56,6 +115,7 @@ fn parse_helpers(input: ParseStream, helpers: &mut Vec<String>) -> Result<()>{
     Ok(())
 }
 
+/// Parses the template attribute arguments
 impl Parse for TemplateArgs{
     fn parse(input: ParseStream) -> Result<Self> {
         let mut src : Option<String> = None;
@@ -87,13 +147,19 @@ impl Parse for TemplateArgs{
     }
 }
 
+/// Parts needed for generating the Display implementation
 struct DisplayParts{
+    /// Name of the struct being derived
     name: Ident,
+    /// Generic parameters
     generics: proc_macro2::TokenStream,
+    /// Required use statements
     uses: proc_macro2::TokenStream,
+    /// Generated template code
     content: proc_macro2::TokenStream
 }
 
+/// Parses the derive input and generates the implementation
 impl Parse for DisplayParts{
     fn parse(input: ParseStream) -> Result<Self> {
         let input = input.parse::<DeriveInput>()?;
@@ -166,6 +232,7 @@ impl Parse for DisplayParts{
     }
 }
 
+/// Derive macro for implementing Handlebars templating
 #[proc_macro_derive(WithRustyHandlebars, attributes(template))]
 pub fn make_renderable(raw: TokenStream) -> TokenStream{
     let DisplayParts{

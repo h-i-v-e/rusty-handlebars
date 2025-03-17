@@ -1,3 +1,50 @@
+//! Handlebars template parser and compiler
+//!
+//! This crate provides the core functionality for parsing and compiling Handlebars templates
+//! into Rust code. It's used internally by the `rusty-handlebars` crate to process templates
+//! at compile time.
+//!
+//! # Features
+//!
+//! - Handlebars template parsing
+//! - Template compilation to Rust code
+//! - Support for all standard Handlebars features:
+//!   - Variables and expressions
+//!   - Block helpers (if, unless, each, with)
+//!   - Partials
+//!   - Comments
+//!   - HTML escaping
+//!   - Whitespace control
+//!   - Subexpressions
+//!   - Lookup helpers
+//!
+//! # Example
+//!
+//! ```rust
+//! use rusty_handlebars_parser::{Compiler, Options, BlockMap};
+//! use rusty_handlebars_parser::block::add_builtins;
+//!
+//! let mut factories = BlockMap::new();
+//! add_builtins(&mut factories);
+//!
+//! let compiler = Compiler::new(Options {
+//!     write_var_name: "f",
+//!     root_var_name: Some("self")
+//! }, factories);
+//!
+//! let template = "Hello {{name}}!";
+//! let rust_code = compiler.compile(template).unwrap();
+//! ```
+//!
+//! # Module Structure
+//!
+//! - `compiler.rs`: Main compiler implementation
+//! - `block.rs`: Block helper implementations
+//! - `expression.rs`: Expression parsing and evaluation
+//! - `expression_tokenizer.rs`: Tokenization of expressions
+//! - `error.rs`: Error types and handling
+//! - `build_helper.rs`: Helper functions for template building
+
 mod error;
 mod expression;
 mod expression_tokenizer;
@@ -107,7 +154,7 @@ mod tests {
     #[test]
     fn test_indexer(){
         let rust = compile("{{#each things}}Hello{{{@index}}}{{#each things}}{{{lookup other @../index}}}{{{@index}}}{{/each}}{{/each}}");
-        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{write!(f, \"Hello{}\", i_1.as_display())?;let mut i_2 = 0;for this_2 in this_1.things{write!(f, \"{}{}\", this_2.other[i_1].as_display(), i_2.as_display())?;i_2 += 1;}i_1 += 1;}");
+        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{write!(f, \"Hello{}\", i_1.as_display())?;let mut i_2 = 0;for this_2 in this_1.things{write!(f, \"{}{}\", this_2.other[i_1].as_display(), i_2.as_display())?;i_2+=1;}i_1+=1;}");
     }
 
     #[test]
@@ -119,7 +166,7 @@ mod tests {
     #[test]
     fn test_subexpression(){
         let rust = compile("{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}");
-        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{{let other_2 = self.other[i_1];write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1 += 1;}");
+        assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{{let other_2 = self.other[i_1];write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1+=1;}");
     }
 
     #[test]
@@ -129,7 +176,7 @@ mod tests {
             write_var_name: "f"
         }, make_map()).compile("{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}").unwrap();
         assert_eq!(rust.uses().to_string(), "use rusty_handlebars::AsDisplay");
-        assert_eq!(rust.code, "let mut i_1 = 0;for this_1 in things{{let other_2 = other[i_1];write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1 += 1;}");
+        assert_eq!(rust.code, "let mut i_1 = 0;for this_1 in things{{let other_2 = other[i_1];write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1+=1;}");
     }
 
     #[test]

@@ -1,30 +1,57 @@
-/*! as_bool provides an expanded notion of what is *true* and what is *false*.
+/*
+This is stolen and modified from the as_bool crate.
 
-    Specifically with the AsBool trait, which an implementing type can
-    use to express how it should be represented in a boolean context.
+https://crates.io/crates/as_bool
+ */
 
-    This crate also provides implementations of AsBool for Rust's builtin types
-    and collections from the Standard Library. These implementations provide a
-    truth table similar to the *Groovy Truth* implemented in the Groovy
-    programming language. The truth table can be described as follow:
+//! Boolean conversion trait for various Rust types
+//!
+//! This module provides the `AsBool` trait which defines how different types
+//! should behave in a boolean context. It's used internally by the Handlebars
+//! templating engine for conditional rendering.
+//!
+//! The trait is based on the [as_bool crate](https://crates.io/crates/as_bool)
+//! but has been modified to suit the needs of this project.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use rusty_handlebars::AsBool;
+//!
+//! // Numbers
+//! assert!(1.as_bool());
+//! assert!(!0.as_bool());
+//!
+//! // Strings
+//! assert!("hello".as_bool());
+//! assert!(!"".as_bool());
+//!
+//! // Collections
+//! let vec = vec![1, 2, 3];
+//! assert!(vec.as_bool());
+//! assert!(!Vec::<i32>::new().as_bool());
+//!
+//! // Options
+//! assert!(Some(1).as_bool());
+//! assert!(!None::<i32>.as_bool());
+//! ```
 
-    * booleans behave as expected.
-    * all non-zero numbers are `true`.
-    * `0` , `0.0` , `f32::NAN`, `f64::NAN`, and `'\0'` are `false`.
-    * non-empty strings are `true`.
-    * empty strings are `false`.
-    * non-empty collections are `true`.
-    * empty collections are `false`.
-    * `None` is always `false`.
-    * `Err` is always `false`.
-    * `Ok` and `Some` are unwrapped and the contained item is evaluated according
-    to the preceding rules.
-**/
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque};
 
-/// `AsBool` defines a type's behavior in a boolean context. Basically, it converts
-/// the implementing type to `bool`.
+/// Trait for converting values to boolean
+///
+/// This trait defines how different types should behave in a boolean context.
+/// It's used internally by the Handlebars templating engine for conditional rendering.
+///
+/// # Implementation Rules
+///
+/// - Numbers: `true` if non-zero, `false` if zero
+/// - Strings: `true` if non-empty, `false` if empty
+/// - Collections: `true` if non-empty, `false` if empty
+/// - Options: `true` if Some and inner value is true, `false` otherwise
+/// - Results: `true` if Ok and inner value is true, `false` otherwise
 pub trait AsBool {
+    /// Converts the value to a boolean
     fn as_bool(&self) -> bool;
 }
 
