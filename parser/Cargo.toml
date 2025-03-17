@@ -2,6 +2,13 @@
 name = "rusty-handlebars-parser"
 version = "0.1.0"
 edition = "2021"
+description = "Compiler for the rusty-handlebars template engine"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+license-file = "../LICENSE.txt"
+keywords = ["handlebars", "template", "engine"]
+categories = ["template-engine", "compilers"]
 
 [dependencies]
 regex.workspace = true

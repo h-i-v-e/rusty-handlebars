@@ -5,6 +5,11 @@ members = [
   "examples"
 ]
 
+[workspace.package]
+authors = ["Jerome Johnson <nosnhoj.emorej@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/h-i-v-e/rusty-handlebars"
+
 [workspace.dependencies]
 regex = "1.11.1"
 minify-html = "0.15.0"
@@ -14,9 +19,9 @@ name = "rusty-handlebars"
 version = "0.1.0"
 edition = "2021"
 description = "Fast compile time handlebars template engine for Rust"
-authors = ["Jerome Johnson <nosnhoj.emorej@gmail.com>"]
-license = "MIT"
-repository = "https://github.com/h-i-v-e/rusty-handlebars"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
 license-file = "LICENSE.txt"
 keywords = ["handlebars", "template", "engine"]
 categories = ["template-engine", "compilers"]
