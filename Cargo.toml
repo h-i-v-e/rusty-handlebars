@@ -16,19 +16,18 @@ minify-html = "0.15.0"
 
 [package]
 name = "rusty-handlebars"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Fast compile time handlebars template engine for Rust"
 authors.workspace = true
-license.workspace = true
 repository.workspace = true
 license-file = "LICENSE.txt"
 keywords = ["handlebars", "template", "engine"]
 categories = ["template-engine", "compilers"]
 
 [dependencies]
-rusty-handlebars-derive = { path = "derive", version = "0.1.0"}
-rusty-handlebars-parser = { path = "parser", version = "0.1.0", optional = true }
+rusty-handlebars-derive = { path = "derive", version = "0.1.1"}
+rusty-handlebars-parser = { path = "parser", version = "0.1.1", optional = true }
 
 [features]
 parser = ["dep:rusty-handlebars-parser"]

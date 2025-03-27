@@ -1,12 +1,11 @@
 [package]
 name = "rusty-handlebars-derive"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Derive macros for the rusty-handlebars template engine"
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-license-file = "../LICENSE.txt"
 
 [lib]
 proc-macro = true
@@ -16,7 +15,7 @@ minify-html = {workspace = true, optional = true}
 proc-macro2 = "1.0.36"
 quote = "1.0.15"
 regex.workspace = true
-rusty-handlebars-parser = {path = "../parser", version = "0.1.0"}
+rusty-handlebars-parser = {path = "../parser", version = "0.1.1"}
 syn = {version = "^2.0.0", features = ["full"]}
 toml = "0.8.19"
 

@@ -50,6 +50,7 @@ pub enum TokenType<'a> {
     SubExpression(&'a str),
     /// A private variable prefixed with @
     PrivateVariable,
+    Variable,
     /// A plain text literal
     Literal
 }
@@ -82,6 +83,23 @@ fn find_closing(src: &str) -> Result<usize> {
     Err(ParseError{ message: format!("unmatched brackets near {}", rcap(src))})
 }
 
+fn find_end_of_string(src: &str) -> Result<usize> {
+    let cliped = &src[1..];
+    let mut escaped = false;
+    for (i, c) in cliped.char_indices() {
+        match c {
+            '\\' => escaped = !escaped,
+            '"' => {
+                if !escaped {
+                    return Ok(i + 2);
+                }
+            }
+            _ => ()
+        }
+    }
+    Err(ParseError{ message: format!("unterminated string near {}", rcap(src))})
+}
+
 /// Finds the end of a token by looking for whitespace or special characters
 fn find_end(src: &str) -> usize {
     for (i, c) in src.char_indices() {
@@ -90,6 +108,10 @@ fn find_end(src: &str) -> usize {
         }
     }
     src.len()
+}
+
+fn is_number(src: &str) -> bool {
+    src.chars().all(|c| c.is_digit(10) || c == '.')
 }
 
 /// Parses a single token from the input string
@@ -113,9 +135,13 @@ fn parse<'a>(src: &'a str) -> Result<Option<Token<'a>>> {
         },
         None => None,
         _ => {
-            let end = find_end(src);
+            let (end, token_type) = if src.starts_with('"') {
+                (find_end_of_string(src)?, TokenType::Literal)
+            } else {
+                (find_end(src), if is_number(src) { TokenType::Literal } else { TokenType::Variable })
+            };
             Some(Token {
-                token_type: TokenType::Literal,
+                token_type,
                 value: &src[..end],
                 tail: &src[end..].trim_start()
             })

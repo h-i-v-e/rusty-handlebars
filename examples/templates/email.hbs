@@ -11,6 +11,7 @@
                 <thead>
                     <tr>
                         <th style="text-align:left;color:#000">Item</th>
+                        <th style="text-align:left;color:#000">Price</th>
                         <th style="color:#000">Result</th>
                     </tr>
                 </thead>
@@ -18,6 +19,7 @@
                     {{~#each_ref checklist.items~}}
                     <tr>
                         <td style="padding-right:64px">{{title}}</td>
+                        <td style="padding-right:64px">{{#if_some price}}${{format "{:.2}" this}}{{else}}-{{/if_some}}</td>
                         {{~#if (lookup ../response.responses @index)}}<td style="color:#060;font-weight:bold">pass</td>{{else}}<td style="color:#c00;font-weight:bold">fail</td>{{/if~}}
                     </tr>
                     {{~/each_ref~}}

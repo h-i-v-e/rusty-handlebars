@@ -126,7 +126,8 @@ enum PendingWrite<'a>{
     /// Raw text to write
     Raw(&'a str),
     /// Expression to evaluate and write
-    Expression((Expression<'a>, &'static str, &'static str))
+    Expression((Expression<'a>, &'static str, &'static str)),
+    Format((&'a str, &'a str, &'a str))
 }
 
 /// Rust code generation state
@@ -352,9 +353,12 @@ impl<'a> Compile<'a>{
                 let (name, scope) = self.find_scope(var.value)?;
                 scope.opened.resolve_private(scope.depth, expression, name, rust)?;
             },
-            TokenType::Literal => {
+            TokenType::Variable => {
                 let (name, scope) = self.find_scope(var.value)?;
                 self.resolve_var(name, scope, &mut rust.code)?;
+            },
+            TokenType::Literal => {
+                rust.code.push_str(var.value);
             },
             TokenType::SubExpression(raw) => {
                 self.resolve_sub_expression(raw, var.value, rust)?;
@@ -508,25 +512,63 @@ impl Compiler {
         for pending in pending.iter(){
             match pending{
                 PendingWrite::Raw(raw) => rust.code.push_str(self.escape(raw).as_ref()),
-                PendingWrite::Expression(_) => rust.code.push_str("{}")
+                PendingWrite::Expression(_) => rust.code.push_str("{}"),
+                PendingWrite::Format((_, format, _)) => rust.code.push_str(format)
             }
         }
         rust.code.push('"');
         for pending in pending.iter(){
-            if let PendingWrite::Expression((expression, uses, display)) = pending{
-                compile.resolve(&Expression{
-                    expression_type: ExpressionType::Raw,
-                    prefix: ", ",
-                    content: expression.content,
-                    postfix: display,
-                    raw: expression.raw
-                }, rust)?;
-                rust.using.insert(uses.to_string());
+            match pending{
+                PendingWrite::Expression((expression, uses, display)) => {
+                    compile.resolve(&Expression{
+                        expression_type: ExpressionType::Raw,
+                        prefix: ", ",
+                        content: expression.content,
+                        postfix: display,
+                        raw: expression.raw
+                    }, rust)?;
+                    rust.using.insert(uses.to_string());
+                },
+                PendingWrite::Format((raw, _, content)) => {
+                    compile.resolve(&Expression{
+                        expression_type: ExpressionType::Raw,
+                        prefix: ", ",
+                        content,
+                        postfix: "",
+                        raw
+                    }, rust)?;
+                },
+                _ => ()
             }
         }
         rust.code.push_str(")?;");
         pending.clear();
         Ok(())
+    }
+
+    fn select_write<'a>(expression: &Expression<'a>, uses: &'static str, postfix: &'static str) -> Result<PendingWrite<'a>>{
+        if let Some(token) = Token::first(&expression.content)?{
+            if let TokenType::Variable = token.token_type{
+                if token.value != "format"{
+                    return Ok(PendingWrite::Expression((expression.clone(), uses, postfix)));
+                }
+                let pattern = match token.next()?{
+                    Some(token) => token,
+                    _ => return Ok(PendingWrite::Expression((expression.clone(), uses, postfix)))
+                };
+                let value = match pattern.next(){
+                    Ok(Some(token)) => token,
+                    _ => return Err(ParseError::new("format requires 2 arguments", expression))
+                };
+                if let TokenType::Literal = pattern.token_type{
+                    if pattern.value.starts_with('"') && pattern.value.ends_with('"'){
+                        return Ok(PendingWrite::Format((expression.raw, &pattern.value[1..pattern.value.len() - 1], value.value)));
+                    }
+                }
+                return Err(ParseError::new("first argument of format must be a string literal", expression));
+            }
+        }
+        Ok(PendingWrite::Expression((expression.clone(), uses, postfix)))
     }
 
     /// Compiles a template
@@ -549,12 +591,12 @@ impl Compiler {
                 pending.push(PendingWrite::Raw(prefix));
             }
             match expression_type{
-                ExpressionType::Raw => pending.push(PendingWrite::Expression((expr.clone(), USE_AS_DISPLAY, ".as_display()"))),
+                ExpressionType::Raw => pending.push(Self::select_write(&expr, USE_AS_DISPLAY, ".as_display()")?),
                 ExpressionType::HtmlEscaped => if *content == "else" {
                     self.commit_pending(&mut pending, &mut compile, &mut rust)?;
                     compile.handle_else(&expr, &mut rust)?
                 } else {
-                    pending.push(PendingWrite::Expression((expr.clone(), USE_AS_DISPLAY_HTML, ".as_display_html()")))
+                    pending.push(Self::select_write(&expr, USE_AS_DISPLAY_HTML, ".as_display_html()")?)
                 },
                 ExpressionType::Open => {
                     self.commit_pending(&mut pending, &mut compile, &mut rust)?;

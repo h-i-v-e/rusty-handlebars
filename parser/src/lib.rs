@@ -48,7 +48,6 @@
 mod error;
 mod expression;
 mod expression_tokenizer;
-//mod optimizer;
 mod compiler;
 mod block;
 pub mod build_helper;
@@ -164,6 +163,12 @@ mod tests {
     }
 
     #[test]
+    fn test_literals(){
+        let rust = compile("{{#if_some (try_lookup thing \"test\")}}{{this}}{{/if_some}} {{#if_some (try_lookup other_thing 123)}}{{this}}{{/if_some}}");
+        assert_eq!(rust, "if let Some(this_1) = self.thing.get(\"test\"){write!(f, \"{}\", this_1.as_display_html())?;}write!(f, \" \")?;if let Some(this_1) = self.other_thing.get(123){write!(f, \"{}\", this_1.as_display_html())?;}");
+    }
+
+    #[test]
     fn test_subexpression(){
         let rust = compile("{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}");
         assert_eq!(rust, "let mut i_1 = 0;for this_1 in self.things{{let other_2 = self.other[i_1];write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1+=1;}");
@@ -196,5 +201,11 @@ mod tests {
     fn test_escaped(){
         let rust = compile("{{{{skip}}}}wang doodle {{{{/dandy}}}}{{{{/skip}}}}");
         assert_eq!(rust, "write!(f, \"wang doodle {{{{{{{{/dandy}}}}}}}}\")?;");
+    }
+
+    #[test]
+    fn test_format_number(){
+        let rust = compile("Price: ${{format \"{:.2}\" price}}");
+        assert_eq!(rust, "write!(f, \"Price: ${:.2}\", self.price)?;");
     }
 }

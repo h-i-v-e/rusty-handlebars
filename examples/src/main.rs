@@ -7,7 +7,8 @@ struct Checklist<'a, 'b>{
 }
 
 struct ChecklistItem<'a>{
-    title: &'a str
+    title: &'a str,
+    price: Option<f64>
 }
 
 struct ChecklistResponseSave{
@@ -140,9 +141,9 @@ fn main(){
         checklist: &Checklist{
             title: "Safety Checklist",
             items: vec![
-                ChecklistItem{title: "Item 1"},
-                ChecklistItem{title: "Item 2"},
-                ChecklistItem{title: "Item 3"}
+                ChecklistItem{title: "Item 1", price: Some(10.0)},
+                ChecklistItem{title: "Item 2", price: None},
+                ChecklistItem{title: "Item 3", price: Some(20.05)},
             ]
         },
         response: &ChecklistResponseSave{
