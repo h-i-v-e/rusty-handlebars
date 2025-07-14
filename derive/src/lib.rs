@@ -74,14 +74,12 @@ fn find_path() -> PathBuf{
             None => return path,
             Some(parent) => parent.to_path_buf()
         };
-        //println!("workspace {:?}", workspace);
         let cargo = workspace.join("Cargo.toml");
         if cargo.exists(){
             let contents = std::fs::read_to_string(&cargo).map(|contents| Value::from_str(&contents).unwrap()).unwrap();
             if let Some(members) = contents.get("workspace")
             .and_then(|workspace| workspace.get("members"))
             .and_then(|members| members.as_array()){
-                //println!("searching for {} in members {:?}", name, members);
                 if members.iter().find(|item| item.as_str().unwrap() == name).is_some(){
                     return workspace;
                 }

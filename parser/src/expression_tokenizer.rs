@@ -19,8 +19,8 @@
 //! Variables prefixed with @ that have special meaning:
 //! ```
 //! @index
-//! @first
-//! @last
+//! @key
+//! @value
 //! ```
 //!
 //! ## Sub-expressions
@@ -110,8 +110,11 @@ fn find_end(src: &str) -> usize {
     src.len()
 }
 
-fn is_number(src: &str) -> bool {
-    src.chars().all(|c| c.is_digit(10) || c == '.')
+fn invalid_variable_name(src: &str) -> bool {
+    if src.starts_with("../"){
+        return false; // ../ is valid for relative paths
+    }
+    return src.chars().next().map(|c| !(c.is_alphabetic() || c == '_')).unwrap_or(false)
 }
 
 /// Parses a single token from the input string
@@ -138,7 +141,7 @@ fn parse<'a>(src: &'a str) -> Result<Option<Token<'a>>> {
             let (end, token_type) = if src.starts_with('"') {
                 (find_end_of_string(src)?, TokenType::Literal)
             } else {
-                (find_end(src), if is_number(src) { TokenType::Literal } else { TokenType::Variable })
+                (find_end(src), if invalid_variable_name(src) { TokenType::Literal } else { TokenType::Variable })
             };
             Some(Token {
                 token_type,

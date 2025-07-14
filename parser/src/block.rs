@@ -409,14 +409,14 @@ impl BlockFactory for EachRefFty {
     }
 }
 
-static IF: IfFty = IfFty{};
-static UNLESS: UnlessFty = UnlessFty{};
-static IF_SOME: IfSomeFty = IfSomeFty{};
-static IF_SOME_REF: IfSomeRefFty = IfSomeRefFty{};
-static WITH: WithFty = WithFty{};
-static WITH_REF: WithRefFty = WithRefFty{};
-static EACH: EachFty = EachFty{};
-static EACH_REF: EachRefFty = EachRefFty{};
+const IF: IfFty = IfFty{};
+const UNLESS: UnlessFty = UnlessFty{};
+const IF_SOME: IfSomeFty = IfSomeFty{};
+const IF_SOME_REF: IfSomeRefFty = IfSomeRefFty{};
+const WITH: WithFty = WithFty{};
+const WITH_REF: WithRefFty = WithRefFty{};
+const EACH: EachFty = EachFty{};
+const EACH_REF: EachRefFty = EachRefFty{};
 
 /// Adds built-in block helpers to the block map
 pub fn add_builtins(map: &mut BlockMap) {

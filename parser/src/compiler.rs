@@ -262,19 +262,16 @@ impl<'a> Compile<'a>{
     fn find_scope(&self, var: &'a str) -> Result<(&'a str, &Scope)>{
         let mut scope = self.open_stack.last().unwrap();
         let mut local = var;
-        loop {
-            if local.starts_with("../"){
-                match scope.depth{
-                    0 => return Err(ParseError{ message: format!("unable to resolve scope for {}", var)}),
-                    _ => {
-                        local = &var[3 ..];
-                        scope = self.open_stack.get(scope.depth - 1).unwrap();
-                        continue;
-                    }
+        while local.starts_with("../"){
+            match scope.depth{
+                0 => return Err(ParseError{ message: format!("unable to resolve scope for {}", var)}),
+                _ => {
+                    local = &var[3 ..];
+                    scope = self.open_stack.get(scope.depth - 1).unwrap();
                 }
             }
-            return Ok((local, scope));
         }
+        return Ok((local, scope));
     }
 
     /// Resolves a local variable
@@ -332,7 +329,7 @@ impl<'a> Compile<'a>{
         else{
             self.resolve_var(var, parent, buffer)?;
         }
-        return Ok(());
+        Ok(())
     }
 
     /// Resolves a sub-expression
