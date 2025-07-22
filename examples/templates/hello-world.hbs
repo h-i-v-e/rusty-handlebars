@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rusty Handlebars Test</title>
+</head>
+<body>
+    {{#each message as |word|}}
+        {{#if @index}}
+            &nbsp;
+        {{/if}}
+        {{word}}
+    {{/each_ref}}
+</body>
+</html>

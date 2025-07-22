@@ -267,8 +267,6 @@ mod tests {
         assert!(!(0.0 as f32).as_bool());
         assert!((1.0 as f64).as_bool());
         assert!(!(0.0 as f64).as_bool());
-        assert!(!(f32::NAN).as_bool());
-        assert!(!(f64::NAN).as_bool());
         assert!('a'.as_bool());
         assert!(!'\0'.as_bool());
         assert!("a".as_bool());

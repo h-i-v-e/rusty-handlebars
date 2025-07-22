@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .header, .footer {
+            text-align: center;
+            background-color: #f8f9fa;
+            padding: 10px;
+        }
+        .content {
+            margin: 20px 0;
+        }
+        .content p {
+            margin: 10px 0;
+        }
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .report-table th, .report-table td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+        .report-link {
+            color: #0066cc;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h2>Daily Customer Safety Reports Preview</h2>
+    </div>
+    <div class="content">
+        <p>Dear {{name}},</p>
+        <p>As we navigate through the week, we are preparing daily dispatches of the weekly safety event reports to individual customers. These reports are pivotal in maintaining transparency and fostering trust with our clientele, offering insights into the safety events displayed on their Sonasafe dashboard.</p>
+
+
+
+        <p>Below is a preview of the reports scheduled to be sent out today:</p>
+        <table class="report-table">
+            <thead>
+            <tr>
+                <th>Customer Name</th>
+                <th>Email</th>
+                <th>Company Name</th>
+                <th>Report Timeframe</th>
+                <th>Event Count</th>
+                <th>PDF Report</th>
+            </tr>
+            </thead>
+            <tbody>
+            {{#each reports}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td>{{email}}</td>
+                    <td>{{customer_name}}</td>
+                    <td>{{date_range}}</td>
+                    <td>{{event_count}}</td>
+                    <td>{{#if_some_ref file_name as |file_name|}}
+                        <a href="https://eventexportdev.blob.core.windows.net/{{../../container}}/{{file_name}}" class="report-link">
+                            View PDF
+                        </a>{{/if_some_ref}}
+                    </td>
+                </tr>
+            {{/each}}
+            </tbody>
+        </table>
+
+
+
+        <p>We value your oversight in reviewing these reports to ensure the consistency and accuracy of the information that will be shared with our customers. Your feedback is a cornerstone in upholding the quality and reliability of our service.</p>
+    </div>
+</div>
+
+
+
+</body>
+</html>

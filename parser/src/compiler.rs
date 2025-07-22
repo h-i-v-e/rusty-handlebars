@@ -145,16 +145,19 @@ pub static USE_AS_DISPLAY_HTML: &str = "AsDisplayHtml";
 
 /// Helper for formatting use statements
 pub struct Uses<'a>{
-    uses: &'a HashSet<String>
+    uses: &'a HashSet<String>,
+    crate_name: &'a str
 }
 
 impl<'a> Display for Uses<'a>{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.uses.len(){
             0 => (),
-            1 => write!(f, "use rusty_handlebars::{}", self.uses.iter().next().unwrap())?,
+            1 => write!(f, "use {}::{}", self.crate_name, self.uses.iter().next().unwrap())?,
             _ => {
-                f.write_str("use rusty_handlebars::")?;
+                f.write_str("use ")?;
+                f.write_str(&self.crate_name)?;
+                f.write_str("::")?;
                 let mut glue = '{';
                 for use_ in self.uses{
                     f.write_char(glue)?;
@@ -178,8 +181,8 @@ impl Rust{
     }
 
     /// Returns a formatter for use statements
-    pub fn uses(&self) -> Uses{
-        Uses{ uses: &self.using}
+    pub fn uses<'a>(&'a self, crate_name: &'a str) -> Uses<'a>{
+        Uses{ uses: &self.using, crate_name}
     }
 }
 
@@ -266,7 +269,7 @@ impl<'a> Compile<'a>{
             match scope.depth{
                 0 => return Err(ParseError{ message: format!("unable to resolve scope for {}", var)}),
                 _ => {
-                    local = &var[3 ..];
+                    local = &local[3 ..];
                     scope = self.open_stack.get(scope.depth - 1).unwrap();
                 }
             }

@@ -101,7 +101,8 @@ struct TemplateArgs{
     /// List of custom helper functions
     helpers: Vec<String>,
     /// Whether to minify the HTML output
-    minify: bool
+    minify: bool,
+    crate_name: Option<String>
 }
 
 /// Parses helper function names from the attribute
@@ -117,6 +118,7 @@ fn parse_helpers(input: ParseStream, helpers: &mut Vec<String>) -> Result<()>{
 impl Parse for TemplateArgs{
     fn parse(input: ParseStream) -> Result<Self> {
         let mut src : Option<String> = None;
+        let mut crate_name: Option<String> = None;
         let mut minify = true;
         let mut helpers = Vec::<String>::new();
         loop {
@@ -126,6 +128,7 @@ impl Parse for TemplateArgs{
             match label.as_str(){
                 "minify" => minify = input.parse::<LitBool>()?.value(),
                 "path" => src = Some(input.parse::<LitStr>()?.value()),
+                "crate_name" => crate_name = Some(input.parse::<LitStr>()?.value()),
                 "helpers" => parse_helpers(input, &mut helpers)?,
                 _ => return Err(
                     syn::Error::new(
@@ -140,7 +143,7 @@ impl Parse for TemplateArgs{
             input.parse::<Token!(,)>()?;
         }
         Ok(TemplateArgs{
-            src, helpers, minify
+            src, helpers, minify, crate_name
         })
     }
 }
@@ -161,7 +164,7 @@ struct DisplayParts{
 impl Parse for DisplayParts{
     fn parse(input: ParseStream) -> Result<Self> {
         let input = input.parse::<DeriveInput>()?;
-        let lifetimes = input.generics.into_token_stream();
+        let generics = input.generics.into_token_stream();
         let name = input.ident;
         let attr = match input.attrs.get(0){
             None => return Err(
@@ -222,9 +225,10 @@ impl Parse for DisplayParts{
         for helper in args.helpers{
             rust.using.insert(helper);
         }
+        let crate_name = args.crate_name.as_deref().unwrap_or_else(|| "rusty_handlebars");
         Ok(Self{
-            name, generics: lifetimes,
-            uses: proc_macro2::token_stream::TokenStream::from_str(&rust.uses().to_string())?,
+            name, generics,
+            uses: proc_macro2::token_stream::TokenStream::from_str(&rust.uses(crate_name).to_string())?,
             content: proc_macro2::token_stream::TokenStream::from_str(&rust.code)?
         })
     }

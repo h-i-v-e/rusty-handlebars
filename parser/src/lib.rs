@@ -180,14 +180,14 @@ mod tests {
             root_var_name: None,
             write_var_name: "f"
         }, make_map()).compile("{{#each things}}{{#with (lookup ../other @index) as |other|}}{{{../name}}}: {{{other}}}{{/with}}{{/each}}").unwrap();
-        assert_eq!(rust.uses().to_string(), "use rusty_handlebars::AsDisplay");
+        assert_eq!(rust.uses("rusty_handlebars").to_string(), "use rusty_handlebars::AsDisplay");
         assert_eq!(rust.code, "let mut i_1 = 0;for this_1 in things{{let other_2 = other[i_1];write!(f, \"{}: {}\", this_1.name.as_display(), other_2.as_display())?;}i_1+=1;}");
     }
 
     #[test]
     fn javascript(){
         let rust = Compiler::new(OPTIONS, make_map()).compile("<script>if (location.href.contains(\"localhost\")){ console.log(\"\\{{{{}}}}\") }</script>").unwrap();
-        assert_eq!(rust.uses().to_string(), "");
+        assert_eq!(rust.uses("rusty_handlebars").to_string(), "");
         assert_eq!(rust.code, "write!(f, \"<script>if (location.href.contains(\\\"localhost\\\")){{ console.log(\\\"{{{{}}}}\\\") }}</script>\")?;");
     }
 
@@ -208,4 +208,11 @@ mod tests {
         let rust = compile("Price: ${{format \"{:.2}\" price}}");
         assert_eq!(rust, "write!(f, \"Price: ${:.2}\", self.price)?;");
     }
+
+    /*#[test]
+    fn test_reports(){
+        const SRC: &str = include_str!("../../examples/templates/reports.hbs");
+        let rust = compile(SRC);
+        assert_eq!(rust, "");
+    }*/
 }

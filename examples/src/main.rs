@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt::Display};
 
 use rusty_handlebars::{AsDisplay, WithRustyHandlebars};
+
 struct Checklist<'a, 'b>{
     title: &'a str,
     items: Vec<ChecklistItem<'b>>

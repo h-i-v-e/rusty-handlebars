@@ -18,9 +18,9 @@
 //! use rusty_handlebars::WithRustyHandlebars;
 //!
 //! #[derive(WithRustyHandlebars)]
-//! #[template(path = "templates/hello.hbs")]
+//! #[template(path = "templates/hello_world.hbs")]
 //! struct HelloTemplate {
-//!     name: String,
+//!     message: ["Hello", "World!"],
 //! }
 //! ```
 //!
@@ -194,5 +194,23 @@ impl<T: AsDisplayHtml> AsDisplayHtml for Box<T>{
 impl<T: AsDisplayHtml> AsDisplayHtml for &Box<T>{
     fn as_display_html(&self) -> impl Display {
         self.as_ref().as_display_html()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(WithRustyHandlebars)]
+    #[template(path = "examples/templates/hello-world.hbs", crate_name = "crate")]
+    struct TestTemplate<'a> {
+        message: &'a [&'a str],
+    }
+
+    #[test]
+    fn test_with_rusty_handlebars() {
+        assert!(TestTemplate{
+            message: &["Hello", "World!"],
+        }.to_string().len() != 0)
     }
 }
