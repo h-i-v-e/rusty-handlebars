@@ -53,16 +53,17 @@
 
 use minify_html::minify;
 use regex::Regex;
-use rusty_handlebars_parser::{add_builtins, build_helper, BlockMap, Compiler, Options, USE_AS_DISPLAY};
+use rusty_handlebars_parser::{add_builtins, build_helper, BlockMap, Compiler, Options};
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
+use std::collections::HashMap;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use syn::parse::{Parse, ParseStream};
 use syn::{parse_macro_input, DeriveInput, Ident, LitBool, LitStr, Result, Token};
 use syn::spanned::Spanned;
-use toml::Value;
+use toml::Table;
 
 /// Finds the workspace root path for template resolution
 fn find_path() -> PathBuf{
@@ -76,7 +77,7 @@ fn find_path() -> PathBuf{
         };
         let cargo = workspace.join("Cargo.toml");
         if cargo.exists(){
-            let contents = std::fs::read_to_string(&cargo).map(|contents| Value::from_str(&contents).unwrap()).unwrap();
+            let contents: Table = std::fs::read_to_string(&cargo).map(|contents| contents.parse().unwrap()).unwrap();
             if let Some(members) = contents.get("workspace")
             .and_then(|workspace| workspace.get("members"))
             .and_then(|members| members.as_array()){
@@ -101,24 +102,41 @@ struct TemplateArgs{
     /// List of custom helper functions
     helpers: Vec<String>,
     /// Whether to minify the HTML output
-    minify: bool,
-    crate_name: Option<String>
+    minify: bool
 }
 
 /// Parses helper function names from the attribute
 fn parse_helpers(input: ParseStream, helpers: &mut Vec<String>) -> Result<()>{
-    input.parse::<proc_macro2::Group>()?.stream().into_iter().for_each(|item| {
-        let helper = item.to_string();
-        helpers.push(helper[1..helper.len() - 1].to_string());
-    });
+    let content;
+    syn::bracketed!(content in input);
+    helpers.extend(
+        syn::punctuated::Punctuated::<LitStr, Token![,]>::parse_terminated(&content)?
+            .into_iter()
+            .map(|helper| helper.value())
+    );
     Ok(())
+}
+
+fn helper_paths(helpers: Vec<String>) -> HashMap<String, String> {
+    helpers.into_iter().map(|helper| {
+        let name = helper.rsplit("::").next().unwrap_or(helper.as_str()).to_string();
+        let path = if helper.starts_with("::")
+            || helper.starts_with("crate::")
+            || helper.starts_with("self::")
+            || helper.starts_with("super::")
+        {
+            helper
+        } else {
+            format!("::rusty_handlebars::{}", helper)
+        };
+        (name, path)
+    }).collect()
 }
 
 /// Parses the template attribute arguments
 impl Parse for TemplateArgs{
     fn parse(input: ParseStream) -> Result<Self> {
         let mut src : Option<String> = None;
-        let mut crate_name: Option<String> = None;
         let mut minify = true;
         let mut helpers = Vec::<String>::new();
         loop {
@@ -128,7 +146,6 @@ impl Parse for TemplateArgs{
             match label.as_str(){
                 "minify" => minify = input.parse::<LitBool>()?.value(),
                 "path" => src = Some(input.parse::<LitStr>()?.value()),
-                "crate_name" => crate_name = Some(input.parse::<LitStr>()?.value()),
                 "helpers" => parse_helpers(input, &mut helpers)?,
                 _ => return Err(
                     syn::Error::new(
@@ -143,7 +160,7 @@ impl Parse for TemplateArgs{
             input.parse::<Token!(,)>()?;
         }
         Ok(TemplateArgs{
-            src, helpers, minify, crate_name
+            src, helpers, minify
         })
     }
 }
@@ -154,8 +171,6 @@ struct DisplayParts{
     name: Ident,
     /// Generic parameters
     generics: proc_macro2::TokenStream,
-    /// Required use statements
-    uses: proc_macro2::TokenStream,
     /// Generated template code
     content: proc_macro2::TokenStream
 }
@@ -206,10 +221,12 @@ impl Parse for DisplayParts{
         }
         let mut factories = BlockMap::new();
         add_builtins(&mut factories);
-        let mut rust = match Compiler::new(Options{
+        let rust = match Compiler::new(Options{
             write_var_name: "f",
             root_var_name: Some("self")
-        }, factories).compile(&buf){
+        }, factories)
+        .with_helper_paths(helper_paths(args.helpers))
+        .compile(&buf){
             Ok(rust) => rust,
             Err(err) => {
                 return Err(
@@ -220,15 +237,8 @@ impl Parse for DisplayParts{
                 )
             }
         };
-        rust.using.insert("WithRustyHandlebars".to_string());
-        rust.using.insert(USE_AS_DISPLAY.to_string());
-        for helper in args.helpers{
-            rust.using.insert(helper);
-        }
-        let crate_name = args.crate_name.as_deref().unwrap_or_else(|| "rusty_handlebars");
         Ok(Self{
             name, generics,
-            uses: proc_macro2::token_stream::TokenStream::from_str(&rust.uses(crate_name).to_string())?,
             content: proc_macro2::token_stream::TokenStream::from_str(&rust.code)?
         })
     }
@@ -238,31 +248,43 @@ impl Parse for DisplayParts{
 #[proc_macro_derive(WithRustyHandlebars, attributes(template))]
 pub fn make_renderable(raw: TokenStream) -> TokenStream{
     let DisplayParts{
-        name, generics, uses, content
+        name, generics, content
     } = parse_macro_input!(raw as DisplayParts);
 
-    let mod_name = proc_macro2::token_stream::TokenStream::from_str((
-        format!("{}_with_rusty_handlebars_impl", name.to_string().to_lowercase())
-    ).as_str()).unwrap();
     let generics_str = generics.to_string();
     let cleaned_generics = proc_macro2::token_stream::TokenStream::from_str(Regex::new(r":[^,>]+").unwrap().replace(&generics_str, "").as_ref()).unwrap();
     TokenStream::from(quote! {
-        mod #mod_name{
-            use std::fmt::Display;
-            #uses;
-            use super::#name;
-            impl #generics Display for #name #cleaned_generics {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    #content
-                    Ok(())
-                }
+        impl #generics ::std::fmt::Display for #name #cleaned_generics {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                #content
+                Ok(())
             }
-            impl #generics WithRustyHandlebars for #name #cleaned_generics {}
-            impl #generics AsDisplay for #name #cleaned_generics {
-                fn as_display(&self) -> impl Display{
-                    self
-                }
+        }
+        impl #generics ::rusty_handlebars::WithRustyHandlebars for #name #cleaned_generics {}
+        impl #generics ::rusty_handlebars::AsDisplay for #name #cleaned_generics {
+            fn as_display(&self) -> impl ::std::fmt::Display {
+                self
             }
         }
     })
+}
+
+#[cfg(test)]
+mod tests{
+    use crate::{find_path, helper_paths, TemplateArgs};
+
+    #[test]
+    fn test_find(){
+        println!("{:?}", find_path());
+    }
+
+    #[test]
+    fn parses_and_qualifies_helpers(){
+        let args: TemplateArgs = syn::parse_str(
+            r#"path = "template.hbs", helpers = ["format_date", "crate::capitalize"]"#
+        ).unwrap();
+        let paths = helper_paths(args.helpers);
+        assert_eq!(paths["format_date"], "::rusty_handlebars::format_date");
+        assert_eq!(paths["capitalize"], "crate::capitalize");
+    }
 }

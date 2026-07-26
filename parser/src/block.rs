@@ -76,10 +76,10 @@ impl IfOrUnless {
     pub fn new<'a>(label: &str, prefix: &str, compile: &'a Compile<'a>, token: Token<'a>, expression: &'a Expression<'a>, rust: &mut Rust) -> Result<IfOrUnless> {
         match token.next()? {
             Some(var) => {
-                rust.using.insert("AsBool".to_string());
                 rust.code.push_str(prefix);
+                rust.code.push_str("::rusty_handlebars::AsBool::as_bool(&");
                 compile.write_var(expression, rust, &var)?;
-                rust.code.push_str(".as_bool(){");
+                rust.code.push_str("){");
                 Ok(Self{})
             },
             None => Err(ParseError::new(&format!("expected variable after {}", label), expression))

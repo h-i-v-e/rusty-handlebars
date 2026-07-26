@@ -18,9 +18,9 @@
 //! use rusty_handlebars::WithRustyHandlebars;
 //!
 //! #[derive(WithRustyHandlebars)]
-//! #[template(path = "templates/hello_world.hbs")]
+//! #[template(path = "examples/templates/hello-world.hbs")]
 //! struct HelloTemplate {
-//!     message: ["Hello", "World!"],
+//!     message: &'static [&'static str],
 //! }
 //! ```
 //!
@@ -33,6 +33,8 @@
 //! let safe_html = html.as_display_html().to_string();
 //! // Output: &lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;
 //! ```
+
+extern crate self as rusty_handlebars;
 
 use std::fmt::{Display, Write};
 
@@ -56,12 +58,6 @@ macro_rules! impl_as_display {
                     self
                 }
             }
-
-            impl AsDisplay for &$t{
-                fn as_display(&self) -> impl Display {
-                    self
-                }
-            }
         )*
     }
 }
@@ -70,12 +66,6 @@ macro_rules! impl_as_display_html {
     ($($t:ty),*) => {
         $(
             impl AsDisplayHtml for $t{
-                fn as_display_html(&self) -> impl Display {
-                    self
-                }
-            }
-
-            impl AsDisplayHtml for &$t{
                 fn as_display_html(&self) -> impl Display {
                     self
                 }
@@ -96,6 +86,18 @@ pub trait AsDisplayHtml{
     fn as_display_html(&self) -> impl Display;
 }
 
+impl<T: AsDisplay + ?Sized> AsDisplay for &T {
+    fn as_display(&self) -> impl Display {
+        AsDisplay::as_display(*self)
+    }
+}
+
+impl<T: AsDisplayHtml + ?Sized> AsDisplayHtml for &T {
+    fn as_display_html(&self) -> impl Display {
+        AsDisplayHtml::as_display_html(*self)
+    }
+}
+
 impl_as_display!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize, f32, f64, String, &str, bool);
 
 impl_as_display_html!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize, f32, f64, bool);
@@ -109,22 +111,7 @@ impl<T: AsDisplay> AsDisplay for Option<T> {
     }
 }
 
-impl<T: AsDisplay> AsDisplay for &Option<T>{
-    fn as_display(&self) -> impl Display {
-        match self{
-            Some(t) => t.as_display().to_string(),
-            None => "".as_display().to_string()
-        }
-    }
-}
-
 impl<T: AsDisplay> AsDisplay for Box<T>{
-    fn as_display(&self) -> impl Display {
-        self.as_ref().as_display()
-    }
-}
-
-impl<T: AsDisplay> AsDisplay for &Box<T>{
     fn as_display(&self) -> impl Display {
         self.as_ref().as_display()
     }
@@ -155,12 +142,6 @@ impl AsDisplayHtml for &str{
     }
 }
 
-impl AsDisplayHtml for &&str{
-    fn as_display_html(&self) -> impl Display {
-        DisplayHtml{string: *self}
-    }
-}
-
 impl AsDisplayHtml for String{
     fn as_display_html(&self) -> impl Display {
         DisplayHtml{string: self.as_str()}
@@ -176,22 +157,7 @@ impl<T: AsDisplayHtml> AsDisplayHtml for Option<T>{
     }
 }
 
-impl<T: AsDisplayHtml> AsDisplayHtml for &Option<T>{
-    fn as_display_html(&self) -> impl Display {
-        match self{
-            Some(t) => t.as_display_html().to_string(),
-            None => "".to_string()
-        }
-    }
-}
-
 impl<T: AsDisplayHtml> AsDisplayHtml for Box<T>{
-    fn as_display_html(&self) -> impl Display {
-        self.as_ref().as_display_html()
-    }
-}
-
-impl<T: AsDisplayHtml> AsDisplayHtml for &Box<T>{
     fn as_display_html(&self) -> impl Display {
         self.as_ref().as_display_html()
     }
@@ -202,7 +168,7 @@ mod tests {
     use super::*;
 
     #[derive(WithRustyHandlebars)]
-    #[template(path = "examples/templates/hello-world.hbs", crate_name = "crate")]
+    #[template(path = "examples/templates/hello-world.hbs")]
     struct TestTemplate<'a> {
         message: &'a [&'a str],
     }

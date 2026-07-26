@@ -17,20 +17,21 @@ use minify_html::Cfg;
 /// - Keep essential HTML structure
 #[cfg(feature = "minify-html")]
 pub static COMPRESS_CONFIG: Cfg = Cfg {
+    allow_optimal_entities: false,
     // Minify JavaScript in script tags
     minify_js: true,
     // Minify CSS in style tags
     minify_css: true,
     // Preserve doctype declarations
-    do_not_minify_doctype: true,
+    minify_doctype: false,
     // Ensure attribute values are spec-compliant
-    ensure_spec_compliant_unquoted_attribute_values: true,
+    allow_noncompliant_unquoted_attribute_values: false,
     // Keep closing tags for elements that require them
     keep_closing_tags: true,
     // Preserve html and head opening tags
     keep_html_and_head_opening_tags: true,
     // Maintain spaces between attributes
-    keep_spaces_between_attributes: true,
+    allow_removing_spaces_between_attributes: false,
     // Remove HTML comments
     keep_comments: false,
     // Remove type="text" from input elements
@@ -42,7 +43,7 @@ pub static COMPRESS_CONFIG: Cfg = Cfg {
     // Remove ASP-style template syntax
     preserve_chevron_percent_template_syntax: false,
     // Remove HTML comments
-    remove_bangs: false,
+    remove_bangs: true,
     // Remove XML processing instructions
     remove_processing_instructions: false
 };

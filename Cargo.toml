@@ -11,8 +11,8 @@ license = "MIT"
 repository = "https://github.com/h-i-v-e/rusty-handlebars"
 
 [workspace.dependencies]
-regex = "1.11.1"
-minify-html = "0.15.0"
+regex = "1.13.1"
+minify-html = "0.18.1"
 
 [package]
 name = "rusty-handlebars"

@@ -97,7 +97,7 @@
 //! - Block scope management
 //! - Template structure and formatting
 
-use std::{borrow::Cow, collections::{HashMap, HashSet}, fmt::{Display, Write}};
+use std::{borrow::Cow, collections::HashMap};
 
 use regex::{Captures, Regex};
 
@@ -126,63 +126,36 @@ enum PendingWrite<'a>{
     /// Raw text to write
     Raw(&'a str),
     /// Expression to evaluate and write
-    Expression((Expression<'a>, &'static str, &'static str)),
+    Expression((Expression<'a>, DisplayKind)),
     Format((&'a str, &'a str, &'a str))
 }
 
+#[derive(Clone, Copy)]
+enum DisplayKind {
+    Raw,
+    HtmlEscaped
+}
+
+impl DisplayKind {
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::Raw => ", ::rusty_handlebars::AsDisplay::as_display(&",
+            Self::HtmlEscaped => ", ::rusty_handlebars::AsDisplayHtml::as_display_html(&"
+        }
+    }
+}
+
 /// Rust code generation state
+#[derive(Default)]
 pub struct Rust{
-    /// Set of used traits
-    pub using: HashSet<String>,
     /// Generated code
     pub code: String
-}
-
-/// Trait for HTML escaping
-pub static USE_AS_DISPLAY: &str = "AsDisplay";
-/// Trait for raw HTML output
-pub static USE_AS_DISPLAY_HTML: &str = "AsDisplayHtml";
-
-/// Helper for formatting use statements
-pub struct Uses<'a>{
-    uses: &'a HashSet<String>,
-    crate_name: &'a str
-}
-
-impl<'a> Display for Uses<'a>{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.uses.len(){
-            0 => (),
-            1 => write!(f, "use {}::{}", self.crate_name, self.uses.iter().next().unwrap())?,
-            _ => {
-                f.write_str("use ")?;
-                f.write_str(&self.crate_name)?;
-                f.write_str("::")?;
-                let mut glue = '{';
-                for use_ in self.uses{
-                    f.write_char(glue)?;
-                    f.write_str(use_)?;
-                    glue = ',';
-                }
-                f.write_str("}")?;
-            }
-        }
-        Ok(())
-    }
 }
 
 impl Rust{
     /// Creates a new Rust code generator
     pub fn new() -> Self{
-        Self{
-            using: HashSet::new(),
-            code: String::new()
-        }
-    }
-
-    /// Returns a formatter for use statements
-    pub fn uses<'a>(&'a self, crate_name: &'a str) -> Uses<'a>{
-        Uses{ uses: &self.using, crate_name}
+        Self::default()
     }
 }
 
@@ -228,7 +201,9 @@ pub struct Compile<'a>{
     /// Stack of open blocks
     pub open_stack: Vec<Scope>,
     /// Map of block helpers
-    pub block_map: &'a BlockMap
+    pub block_map: &'a BlockMap,
+    /// Fully qualified paths for inline helpers
+    helper_paths: &'a HashMap<String, String>
 }
 
 /// Appends a depth suffix to a variable name
@@ -251,13 +226,14 @@ impl<'a> Block for Root<'a>{
 
 impl<'a> Compile<'a>{
     /// Creates a new compiler
-    fn new(this: Option<&'static str>, block_map: &'a BlockMap) -> Self{
+    fn new(this: Option<&'static str>, block_map: &'a BlockMap, helper_paths: &'a HashMap<String, String>) -> Self{
         Self{
             open_stack: vec![Scope{
                 depth: 0,
                 opened: Box::new(Root{this})
             }],
-            block_map
+            block_map,
+            helper_paths
         }
     }
 
@@ -392,7 +368,7 @@ impl<'a> Compile<'a>{
             "lookup" => self.resolve_lookup(expression, "[", ']', args, rust),
             "try_lookup" => self.resolve_lookup(expression, ".get(", ')', args, rust),
             name => {
-                rust.code.push_str(name);
+                rust.code.push_str(self.helper_paths.get(name).map_or(name, String::as_str));
                 rust.code.push('(');
                 self.write_var(expression, rust, &args)?;
                 loop {
@@ -478,7 +454,9 @@ pub struct Compiler{
     /// Compiler options
     options: Options,
     /// Map of block helpers
-    block_map: BlockMap
+    block_map: BlockMap,
+    /// Fully qualified paths for inline helpers
+    helper_paths: HashMap<String, String>
 }
 
 impl Compiler {
@@ -487,8 +465,16 @@ impl Compiler {
         Self{
             clean: Regex::new("[\\\\\"\\{\\}]").unwrap(),
             options,
-            block_map
+            block_map,
+            helper_paths: HashMap::new()
         }
+    }
+
+    /// Configures fully qualified paths for inline helpers, keyed by the names
+    /// used in templates.
+    pub fn with_helper_paths(mut self, helper_paths: HashMap<String, String>) -> Self {
+        self.helper_paths = helper_paths;
+        self
     }
 
     /// Escapes HTML content
@@ -519,15 +505,14 @@ impl Compiler {
         rust.code.push('"');
         for pending in pending.iter(){
             match pending{
-                PendingWrite::Expression((expression, uses, display)) => {
+                PendingWrite::Expression((expression, display)) => {
                     compile.resolve(&Expression{
                         expression_type: ExpressionType::Raw,
-                        prefix: ", ",
+                        prefix: display.prefix(),
                         content: expression.content,
-                        postfix: display,
+                        postfix: ")",
                         raw: expression.raw
                     }, rust)?;
-                    rust.using.insert(uses.to_string());
                 },
                 PendingWrite::Format((raw, _, content)) => {
                     compile.resolve(&Expression{
@@ -546,15 +531,15 @@ impl Compiler {
         Ok(())
     }
 
-    fn select_write<'a>(expression: &Expression<'a>, uses: &'static str, postfix: &'static str) -> Result<PendingWrite<'a>>{
+    fn select_write<'a>(expression: &Expression<'a>, display: DisplayKind) -> Result<PendingWrite<'a>>{
         if let Some(token) = Token::first(&expression.content)?{
             if let TokenType::Variable = token.token_type{
                 if token.value != "format"{
-                    return Ok(PendingWrite::Expression((expression.clone(), uses, postfix)));
+                    return Ok(PendingWrite::Expression((*expression, display)));
                 }
                 let pattern = match token.next()?{
                     Some(token) => token,
-                    _ => return Ok(PendingWrite::Expression((expression.clone(), uses, postfix)))
+                    _ => return Ok(PendingWrite::Expression((*expression, display)))
                 };
                 let value = match pattern.next(){
                     Ok(Some(token)) => token,
@@ -568,12 +553,16 @@ impl Compiler {
                 return Err(ParseError::new("first argument of format must be a string literal", expression));
             }
         }
-        Ok(PendingWrite::Expression((expression.clone(), uses, postfix)))
+        Ok(PendingWrite::Expression((*expression, display)))
     }
 
     /// Compiles a template
     pub fn compile(&self, src: &str) -> Result<Rust>{
-        let mut compile = Compile::new(self.options.root_var_name, &self.block_map);
+        let mut compile = Compile::new(
+            self.options.root_var_name,
+            &self.block_map,
+            &self.helper_paths
+        );
         let mut rust = Rust::new();
         let mut pending: Vec<PendingWrite> = Vec::new();
         let mut rest = src;
@@ -591,12 +580,12 @@ impl Compiler {
                 pending.push(PendingWrite::Raw(prefix));
             }
             match expression_type{
-                ExpressionType::Raw => pending.push(Self::select_write(&expr, USE_AS_DISPLAY, ".as_display()")?),
+                ExpressionType::Raw => pending.push(Self::select_write(&expr, DisplayKind::Raw)?),
                 ExpressionType::HtmlEscaped => if *content == "else" {
                     self.commit_pending(&mut pending, &mut compile, &mut rust)?;
                     compile.handle_else(&expr, &mut rust)?
                 } else {
-                    pending.push(Self::select_write(&expr, USE_AS_DISPLAY_HTML, ".as_display_html()")?)
+                    pending.push(Self::select_write(&expr, DisplayKind::HtmlEscaped)?)
                 },
                 ExpressionType::Open => {
                     self.commit_pending(&mut pending, &mut compile, &mut rust)?;
