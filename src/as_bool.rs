@@ -1,61 +1,30 @@
-/*
-This is stolen and modified from the as_bool crate.
-
-https://crates.io/crates/as_bool
- */
-
-//! Boolean conversion trait for various Rust types
-//!
-//! This module provides the `AsBool` trait which defines how different types
-//! should behave in a boolean context. It's used internally by the Handlebars
-//! templating engine for conditional rendering.
-//!
-//! The trait is based on the [as_bool crate](https://crates.io/crates/as_bool)
-//! but has been modified to suit the needs of this project.
-//!
-//! # Examples
+//! Truthiness used by the `if` and `unless` template blocks.
 //!
 //! ```rust
 //! use rusty_handlebars::AsBool;
 //!
-//! // Numbers
 //! assert!(1.as_bool());
 //! assert!(!0.as_bool());
-//!
-//! // Strings
 //! assert!("hello".as_bool());
 //! assert!(!"".as_bool());
-//!
-//! // Collections
-//! let vec = vec![1, 2, 3];
-//! assert!(vec.as_bool());
+//! assert!(vec![1, 2, 3].as_bool());
 //! assert!(!Vec::<i32>::new().as_bool());
-//!
-//! // Options
 //! assert!(Some(1).as_bool());
 //! assert!(!None::<i32>.as_bool());
 //! ```
 
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque};
 
-/// Trait for converting values to boolean
+/// Converts a value to the boolean used by template conditionals.
 ///
-/// This trait defines how different types should behave in a boolean context.
-/// It's used internally by the Handlebars templating engine for conditional rendering.
-///
-/// # Implementation Rules
-///
-/// - Numbers: `true` if non-zero, `false` if zero
-/// - Strings: `true` if non-empty, `false` if empty
-/// - Collections: `true` if non-empty, `false` if empty
-/// - Options: `true` if Some and inner value is true, `false` otherwise
-/// - Results: `true` if Ok and inner value is true, `false` otherwise
+/// Numbers are false at zero. Strings and collections are false when empty.
+/// `Option` and `Result` delegate to a contained `Some` or `Ok` value and are
+/// false for `None` or `Err`. The unit value is always false.
 pub trait AsBool {
-    /// Converts the value to a boolean
+    /// Returns this value's template truthiness.
     fn as_bool(&self) -> bool;
 }
 
-// Booleans
 impl AsBool for bool {
     fn as_bool(&self) -> bool {
         *self
@@ -108,14 +77,12 @@ macro_rules! impl_float {
 
 impl_float!(f32, f64);
 
-// Tuples
 impl AsBool for () {
     fn as_bool(&self) -> bool {
         false
     }
 }
 
-// Arrays
 impl<T> AsBool for [T] {
     fn as_bool(&self) -> bool {
         !self.is_empty()
@@ -140,7 +107,13 @@ macro_rules! impl_list {
     }
 }
 
-impl_list!(Vec<T>, VecDeque<T>, LinkedList<T>, BTreeSet<T>, BinaryHeap<T>);
+impl_list!(
+    Vec<T>,
+    VecDeque<T>,
+    LinkedList<T>,
+    BTreeSet<T>,
+    BinaryHeap<T>
+);
 
 macro_rules! impl_string {
     ($($t:ty),*) => {
@@ -182,7 +155,6 @@ macro_rules! impl_map {
 
 impl_map!(HashMap<K, V>, BTreeMap<K, V>, HashSet<K, V>);
 
-// Text
 impl AsBool for char {
     fn as_bool(&self) -> bool {
         *self != '\0'
@@ -195,7 +167,6 @@ impl AsBool for &char {
     }
 }
 
-// Option
 impl<T: AsBool> AsBool for Option<T> {
     fn as_bool(&self) -> bool {
         if let Some(t) = self {
@@ -216,7 +187,6 @@ impl<T: AsBool> AsBool for &Option<T> {
     }
 }
 
-// Result
 impl<T: AsBool, E> AsBool for std::result::Result<T, E> {
     fn as_bool(&self) -> bool {
         if let Ok(t) = self {
@@ -227,7 +197,6 @@ impl<T: AsBool, E> AsBool for std::result::Result<T, E> {
     }
 }
 
-// Tests
 #[cfg(test)]
 mod tests {
     use crate::AsBool;

@@ -2,7 +2,7 @@
 name = "rusty-handlebars-parser"
 version = "0.1.4"
 edition = "2021"
-description = "Compiler for the rusty-handlebars template engine"
+description = "Rust source generator for rusty-handlebars templates"
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -10,7 +10,6 @@ keywords = ["handlebars", "template", "engine"]
 categories = ["template-engine", "compilers"]
 
 [dependencies]
-regex.workspace = true
 minify-html = {workspace = true, optional = true}
 
 [features]

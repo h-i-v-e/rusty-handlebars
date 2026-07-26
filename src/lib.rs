@@ -1,54 +1,59 @@
-//! Rusty Handlebars - A type-safe Handlebars templating engine for Rust
+//! Compile Handlebars-like template files into Rust [`Display`] implementations.
 //!
-//! This crate provides a type-safe implementation of the Handlebars templating engine
-//! with a focus on compile-time template processing and HTML safety.
-//!
-//! # Features
-//!
-//! - Type-safe templating with compile-time validation
-//! - HTML escaping for secure output
-//! - Optional HTML minification
-//! - Derive macro support for easy integration
-//! - Flexible display traits for both regular and HTML-safe output
-//! - Optional parser functionality
-//!
-//! # Examples
+//! [`WithRustyHandlebars`] reads the template named by `#[template(path = "...")]`
+//! while the deriving crate is compiled. Template variables are compiled as field
+//! accesses on the deriving struct, and rendering writes directly to the supplied
+//! formatter.
 //!
 //! ```rust
 //! use rusty_handlebars::WithRustyHandlebars;
 //!
 //! #[derive(WithRustyHandlebars)]
-//! #[template(path = "examples/templates/hello-world.hbs")]
-//! struct HelloTemplate {
-//!     message: &'static [&'static str],
+//! #[template(path = "examples/templates/more-involved.hbs")]
+//! struct Profile<'a> {
+//!     name: &'a str,
+//!     age: u8,
 //! }
+//!
+//! let output = Profile { name: "Ada", age: 36 }.to_string();
+//! assert!(output.contains("Ada"));
 //! ```
 //!
-//! For HTML-safe output:
+//! `{{value}}` uses [`AsDisplayHtml`]. `{{{value}}}` uses [`AsDisplay`] and
+//! writes its result unchanged. The string implementation of [`AsDisplayHtml`]
+//! escapes `&`, `<`, `>`, and `"`, but is not contextual escaping for URLs,
+//! JavaScript, CSS, or unquoted attributes.
 //!
 //! ```rust
 //! use rusty_handlebars::AsDisplayHtml;
 //!
-//! let html = "<script>alert('xss')</script>";
-//! let safe_html = html.as_display_html().to_string();
-//! // Output: &lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;
+//! assert_eq!(
+//!     "<strong title=\"x\">&</strong>".as_display_html().to_string(),
+//!     "&lt;strong title=&quot;x&quot;&gt;&amp;&lt;/strong&gt;"
+//! );
 //! ```
+//!
+//! This is a Rust-oriented source generator, not a runtime Handlebars
+//! interpreter. See the project README for the supported template syntax.
 
 extern crate self as rusty_handlebars;
 
-use std::fmt::{Display, Write};
+use std::fmt::Display;
 
 pub mod as_bool;
 pub use as_bool::AsBool;
 
-/// Derive macro for implementing Handlebars templating on structs
+/// Derives a template-backed [`Display`] implementation.
+///
+/// The required `template` attribute accepts `path`, plus optional `minify`
+/// and `helpers` arguments. See the derive crate documentation for details.
 pub use rusty_handlebars_derive::WithRustyHandlebars;
 
 #[cfg(feature = "parser")]
 pub use rusty_handlebars_parser::{Compiler, Options};
 
-/// Trait that must be implemented for types that can be used with Handlebars templates
-pub trait WithRustyHandlebars : Display{}
+/// Marker implemented by [`WithRustyHandlebars`] for generated renderers.
+pub trait WithRustyHandlebars: Display {}
 
 macro_rules! impl_as_display {
     ($($t:ty),*) => {
@@ -74,15 +79,21 @@ macro_rules! impl_as_display_html {
     }
 }
 
-/// Trait for converting values to a Display implementation
-pub trait AsDisplay{
-    /// Returns a type that implements Display
+/// Supplies the value written by triple-brace interpolation.
+///
+/// Implement this for application types used as `{{{value}}}`. The result is
+/// written without modification by this crate.
+pub trait AsDisplay {
+    /// Returns the value to write.
     fn as_display(&self) -> impl Display;
 }
 
-/// Trait for converting values to an HTML-safe Display implementation
-pub trait AsDisplayHtml{
-    /// Returns a type that implements Display with HTML escaping
+/// Supplies the value written by double-brace interpolation.
+///
+/// String implementations escape `&`, `<`, `>`, and `"`. Implementations for
+/// other application types define their own escaping behavior.
+pub trait AsDisplayHtml {
+    /// Returns the value to write for `{{value}}`.
     fn as_display_html(&self) -> impl Display;
 }
 
@@ -98,66 +109,101 @@ impl<T: AsDisplayHtml + ?Sized> AsDisplayHtml for &T {
     }
 }
 
-impl_as_display!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize, f32, f64, String, &str, bool);
+impl_as_display!(
+    u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize, f32, f64, String, &str, bool
+);
 
-impl_as_display_html!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize, f32, f64, bool);
+impl_as_display_html!(
+    u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize, f32, f64, bool
+);
 
-impl<T: AsDisplay> AsDisplay for Option<T> {
-    fn as_display(&self) -> impl Display {
-        match self{
-            Some(t) => t.as_display().to_string(),
-            None => "".as_display().to_string()
+struct DisplayOption<'a, T> {
+    value: &'a Option<T>,
+}
+
+impl<T: AsDisplay> Display for DisplayOption<'_, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.value {
+            Some(value) => Display::fmt(&value.as_display(), f),
+            None => Ok(()),
         }
     }
 }
 
-impl<T: AsDisplay> AsDisplay for Box<T>{
+impl<T: AsDisplay> AsDisplay for Option<T> {
+    fn as_display(&self) -> impl Display {
+        DisplayOption { value: self }
+    }
+}
+
+impl<T: AsDisplay> AsDisplay for Box<T> {
     fn as_display(&self) -> impl Display {
         self.as_ref().as_display()
     }
 }
 
-struct DisplayHtml<'a>{
-    string: &'a str
+struct DisplayHtml<'a> {
+    string: &'a str,
 }
 
-impl<'a> Display for DisplayHtml<'a>{
+impl<'a> Display for DisplayHtml<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for c in self.string.chars(){
-            match c{
-                '&' => f.write_str("&amp;")?,
-                '<' => f.write_str("&lt;")?,
-                '>' => f.write_str("&gt;")?,
-                '"' => f.write_str("&quot;")?,
-                c => f.write_char(c)?
+        let mut start = 0;
+        for (index, byte) in self.string.bytes().enumerate() {
+            let escaped = match byte {
+                b'&' => "&amp;",
+                b'<' => "&lt;",
+                b'>' => "&gt;",
+                b'"' => "&quot;",
+                _ => continue,
+            };
+            if start < index {
+                f.write_str(&self.string[start..index])?;
             }
+            f.write_str(escaped)?;
+            start = index + 1;
+        }
+        if start < self.string.len() {
+            f.write_str(&self.string[start..])?;
         }
         Ok(())
     }
 }
 
-impl AsDisplayHtml for &str{
+impl AsDisplayHtml for &str {
     fn as_display_html(&self) -> impl Display {
-        DisplayHtml{string: self}
+        DisplayHtml { string: self }
     }
 }
 
-impl AsDisplayHtml for String{
+impl AsDisplayHtml for String {
     fn as_display_html(&self) -> impl Display {
-        DisplayHtml{string: self.as_str()}
-    }
-}
-
-impl<T: AsDisplayHtml> AsDisplayHtml for Option<T>{
-    fn as_display_html(&self) -> impl Display {
-        match self{
-            Some(t) => t.as_display_html().to_string(),
-            None => "".to_string()
+        DisplayHtml {
+            string: self.as_str(),
         }
     }
 }
 
-impl<T: AsDisplayHtml> AsDisplayHtml for Box<T>{
+struct DisplayOptionHtml<'a, T> {
+    value: &'a Option<T>,
+}
+
+impl<T: AsDisplayHtml> Display for DisplayOptionHtml<'_, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.value {
+            Some(value) => Display::fmt(&value.as_display_html(), f),
+            None => Ok(()),
+        }
+    }
+}
+
+impl<T: AsDisplayHtml> AsDisplayHtml for Option<T> {
+    fn as_display_html(&self) -> impl Display {
+        DisplayOptionHtml { value: self }
+    }
+}
+
+impl<T: AsDisplayHtml> AsDisplayHtml for Box<T> {
     fn as_display_html(&self) -> impl Display {
         self.as_ref().as_display_html()
     }
@@ -173,10 +219,65 @@ mod tests {
         message: &'a [&'a str],
     }
 
+    #[derive(WithRustyHandlebars)]
+    #[template(path = "examples/templates/generic.hbs", minify = false)]
+    struct GenericTemplate<'a, T, const N: usize>
+    where
+        T: AsDisplayHtml,
+    {
+        value: &'a T,
+        marker: [u8; N],
+    }
+
+    #[derive(WithRustyHandlebars)]
+    #[template(path = "examples/templates/each-else.hbs", minify = false)]
+    struct EachElseTemplate<'a> {
+        values: Vec<&'a str>,
+    }
+
     #[test]
     fn test_with_rusty_handlebars() {
-        assert!(TestTemplate{
-            message: &["Hello", "World!"],
-        }.to_string().len() != 0)
+        assert!(
+            TestTemplate {
+                message: &["Hello", "World!"],
+            }
+            .to_string()
+            .len()
+                != 0
+        )
+    }
+
+    #[test]
+    fn options_preserve_display_behavior() {
+        assert_eq!(Some("raw").as_display().to_string(), "raw");
+        assert_eq!(None::<&str>.as_display().to_string(), "");
+        assert_eq!(
+            Some("<one> & \"two\"").as_display_html().to_string(),
+            "&lt;one&gt; &amp; &quot;two&quot;"
+        );
+        assert_eq!(None::<&str>.as_display_html().to_string(), "");
+    }
+
+    #[test]
+    fn derive_supports_bounded_and_const_generics() {
+        let value = "generic";
+        let template = GenericTemplate {
+            value: &value,
+            marker: [],
+        };
+        assert_eq!(template.to_string(), "generic\n");
+        assert!(template.marker.is_empty());
+    }
+
+    #[test]
+    fn each_else_renders_both_branches() {
+        assert_eq!(EachElseTemplate { values: vec![] }.to_string(), "empty\n");
+        assert_eq!(
+            EachElseTemplate {
+                values: vec!["one", "two"],
+            }
+            .to_string(),
+            "onetwo\n"
+        );
     }
 }
