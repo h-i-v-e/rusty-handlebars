@@ -2,7 +2,7 @@
   "name": "rusty-handlebars",
   "displayName": "Rusty Handlebars",
   "description": "Template authoring support for compile-time Rusty Handlebars templates.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "rusty-handlebars",
   "license": "MIT",
   "repository": {

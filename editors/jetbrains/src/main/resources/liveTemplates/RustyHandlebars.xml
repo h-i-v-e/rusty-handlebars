@@ -1,0 +1,65 @@
+<templateSet group="Rusty Handlebars">
+  <template name="rh-value" value="{{$VALUE$}}" description="HTML-escaped interpolation" toReformat="false" toShortenFQNames="false">
+    <variable name="VALUE" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true"/>
+    <context><option name="RUSTY_HANDLEBARS" value="true"/></context>
+  </template>
+  <template name="rh-raw" value="{{{$VALUE$}}}" description="Unescaped interpolation" toReformat="false" toShortenFQNames="false">
+    <variable name="VALUE" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true"/>
+    <context><option name="RUSTY_HANDLEBARS" value="true"/></context>
+  </template>
+  <template name="rh-if" value="{{#if $VALUE$}}&#10;  $THEN$&#10;{{else}}&#10;  $ELSE$&#10;{{/if}}" description="If/else block" toReformat="true" toShortenFQNames="false">
+    <variable name="VALUE" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true"/>
+    <variable name="THEN" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+    <variable name="ELSE" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+    <context><option name="RUSTY_HANDLEBARS" value="true"/></context>
+  </template>
+  <template name="rh-unless" value="{{#unless $VALUE$}}&#10;  $BODY$&#10;{{/unless}}" description="Unless block" toReformat="true" toShortenFQNames="false">
+    <variable name="VALUE" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true"/>
+    <variable name="BODY" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+    <context><option name="RUSTY_HANDLEBARS" value="true"/></context>
+  </template>
+  <template name="rh-if-some" value="{{#if_some_ref $VALUE$ as |$ITEM$|}}&#10;  $BODY$&#10;{{else}}&#10;  $ELSE$&#10;{{/if_some_ref}}" description="Borrow optional value" toReformat="true" toShortenFQNames="false">
+    <variable name="VALUE" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true"/>
+    <variable name="ITEM" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true"/>
+    <variable name="BODY" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+    <variable name="ELSE" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+    <context><option name="RUSTY_HANDLEBARS" value="true"/></context>
+  </template>
+  <template name="rh-with" value="{{#with_ref $VALUE$ as |$ITEM$|}}&#10;  $BODY$&#10;{{/with_ref}}" description="Borrow nested context" toReformat="true" toShortenFQNames="false">
+    <variable name="VALUE" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true"/>
+    <variable name="ITEM" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true"/>
+    <variable name="BODY" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+    <context><option name="RUSTY_HANDLEBARS" value="true"/></context>
+  </template>
+  <template name="rh-each" value="{{#each_ref $VALUES$ as |$ITEM$|}}&#10;  $BODY$&#10;{{else}}&#10;  $EMPTY$&#10;{{/each_ref}}" description="Borrowed iteration" toReformat="true" toShortenFQNames="false">
+    <variable name="VALUES" expression="" defaultValue="&quot;values&quot;" alwaysStopAt="true"/>
+    <variable name="ITEM" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true"/>
+    <variable name="BODY" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+    <variable name="EMPTY" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+    <context><option name="RUSTY_HANDLEBARS" value="true"/></context>
+  </template>
+  <template name="rh-lookup" value="{{lookup $VALUES$ $INDEX$}}" description="Indexed lookup" toReformat="false" toShortenFQNames="false">
+    <variable name="VALUES" expression="" defaultValue="&quot;values&quot;" alwaysStopAt="true"/>
+    <variable name="INDEX" expression="" defaultValue="&quot;index&quot;" alwaysStopAt="true"/>
+    <context><option name="RUSTY_HANDLEBARS" value="true"/></context>
+  </template>
+  <template name="rh-try-lookup" value="{{try_lookup $MAP$ $KEY$}}" description="Fallible map lookup" toReformat="false" toShortenFQNames="false">
+    <variable name="MAP" expression="" defaultValue="&quot;map&quot;" alwaysStopAt="true"/>
+    <variable name="KEY" expression="" defaultValue="&quot;key&quot;" alwaysStopAt="true"/>
+    <context><option name="RUSTY_HANDLEBARS" value="true"/></context>
+  </template>
+  <template name="rh-format" value="{{format &quot;{:$SPECIFIER$}&quot; $VALUE$}}" description="Format a value" toReformat="false" toShortenFQNames="false">
+    <variable name="SPECIFIER" expression="" defaultValue="&quot;.2&quot;" alwaysStopAt="true"/>
+    <variable name="VALUE" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true"/>
+    <context><option name="RUSTY_HANDLEBARS" value="true"/></context>
+  </template>
+  <template name="rh-comment" value="{{!-- $COMMENT$ --}}" description="Template comment" toReformat="false" toShortenFQNames="false">
+    <variable name="COMMENT" expression="" defaultValue="&quot;comment&quot;" alwaysStopAt="true"/>
+    <context><option name="RUSTY_HANDLEBARS" value="true"/></context>
+  </template>
+  <template name="rh-raw-block" value="{{{{$NAME$}}}}&#10;$BODY$&#10;{{{{/$NAME$}}}}" description="Raw template block" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;raw&quot;" alwaysStopAt="true"/>
+    <variable name="BODY" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+    <context><option name="RUSTY_HANDLEBARS" value="true"/></context>
+  </template>
+</templateSet>

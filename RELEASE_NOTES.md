@@ -1,89 +1,85 @@
-# Rusty Handlebars 0.2.0
+# Rusty Handlebars 0.3.0
 
-Version 0.2.0 turns Rusty Handlebars into a complete template-authoring
-toolchain while preserving its compile-time rendering model.
+Version 0.3.0 brings the template-authoring toolchain to RustRover and hardens
+the shared language server and native editor packaging while preserving Rusty
+Handlebars' compile-time rendering model.
 
 ## Highlights
 
-### First-class editor support
+### RustRover support
 
-The new VS Code extension registers `.rhbs` as the dedicated Rusty Handlebars
-file type and includes:
+The new RustRover plugin provides:
 
-- HTML-aware syntax highlighting;
-- snippets for interpolation, borrowing blocks, iteration, lookups, formatting,
-  comments, and raw blocks;
-- live structural diagnostics and scoped completion;
-- hover documentation, document symbols, folding, selection ranges, signature
-  help, and matching-block highlights;
-- Cargo-aware field and configured-helper completion;
-- field type hovers and go-to-definition into Rust source;
-- a custom rusty bicycle file icon for light and dark themes;
-- a **Rusty Handlebars: Show Generated Rust** command.
+- a dedicated `.rhbs` file type and bicycle icon;
+- layered HTML and Rusty Handlebars syntax highlighting;
+- comments, delimiter matching, quote handling, and Live Templates;
+- local diagnostics, completion, hover information, definitions, symbols,
+  folding, matching-block highlights, signature help, and selection ranges;
+- Cargo-aware struct-field and configured-helper intelligence;
+- read-only, in-memory generated Rust;
+- project settings for a custom server executable and explicitly opted-in
+  legacy `.hbs` globs;
+- language-server status, restart, and project-index reload controls.
 
-Existing `.hbs` files remain supported. They can use Rusty Handlebars editor
-features through manual language selection or
-`rustyHandlebars.legacyFileGlobs` without the extension claiming all
-Handlebars files globally.
+The plugin targets RustRover 2025.3.1 and newer. It does not claim `.hbs`
+globally or depend on JetBrains' Handlebars plugin.
 
-### One parser for the compiler and editor
+### More portable language-server behavior
 
-The parser now exposes a borrowed, span-aware syntax tree and recoverable
-diagnostics with stable codes. The compiler consumes that same tree directly,
-removing the risk of editor syntax and compiler syntax drifting apart.
+File URIs now use standards-compliant conversion instead of hand-written
+prefix and space replacement. This supports encoded characters, non-ASCII
+paths, Windows drive paths, and UNC paths on their respective platforms while
+rejecting non-file URI schemes.
 
-Malformed documents can report several useful errors in one pass, including
-unclosed expressions and blocks, mismatched closing blocks, invalid helper
-arguments, unterminated strings, unmatched subexpressions, and invalid private
-variables. Byte spans remain efficient inside Rust and are converted to UTF-16
-positions only at the LSP boundary.
+Rust and Cargo changes can refresh the Cargo project index without restarting
+the language server. Reloading builds a replacement index first and retains
+the last valid index if discovery fails. Both VS Code and RustRover watch the
+relevant project inputs, and either client can request an explicit reload.
 
-### Cargo-aware language server
+The server also exposes `--version` and has an in-memory
+initialize/open/change/save/close/shutdown/exit lifecycle test using a
+RustRover-shaped initialization payload.
 
-The native language server uses `cargo metadata` and `syn` to associate
-templates with structs deriving `WithRustyHandlebars`. It indexes named fields
-and configured helpers conservatively, avoiding speculative diagnostics when
-types cannot be resolved.
+### Shared native packaging
 
-The server is packaged into platform-specific VSIX artifacts for macOS ARM64
-and x64, Linux ARM64 and x64, and Windows x64, so end users do not need a Rust
-toolchain.
+VS Code and RustRover releases now consume the same native server artifacts:
 
-Linux x64 and ARM64 servers can also be cross-compiled locally from macOS or
-Linux with `npm run build-server:linux`. The matching VSIX files can be built
-with `npm run package:linux`.
+- macOS ARM64 and x64;
+- Linux musl ARM64 and x64;
+- Windows x64.
 
-### Compiler and quality improvements
+The RustRover workflow assembles one universal plugin archive. Bundled servers
+are extracted into a versioned IDE cache, verified with SHA-256, and made
+executable where required. Unsupported platforms can use a custom server
+binary.
 
-- Valid templates retain their existing generated Rust output.
-- Generated source uses fully qualified paths.
-- Rendering and compile-time template generation avoid several unnecessary
-  allocations and repeated scans.
-- Generic derives, parent-scope resolution, `each` empty branches, and feature
-  propagation have regression coverage.
-- CI now runs formatting, all-feature workspace tests, warning-free Clippy,
-  TypeScript checks, bundling, and extension metadata validation.
+CI builds and tests the RustRover plugin, inspects the universal archive, and
+configures Plugin Verifier coverage for the minimum, latest 2025.3 patch, and
+newer RustRover platform lines.
 
 ## Compatibility notes
 
-- `.rhbs` is recommended for new templates, but `.hbs` remains fully supported
-  by the derive macro and compiler.
-- Borrowing block variants such as `if_some_ref`, `with_ref`, and `each_ref`
-  remain preferred for owned struct fields.
-- The stricter parser now rejects mismatched closing block names that older
-  releases could accept accidentally.
-- Formatting, rendered previews, complete cross-crate Rust type inference, and
-  live overlays for unsaved Rust source remain intentionally deferred.
+- `.rhbs` remains the recommended extension for new templates.
+- Existing `.hbs` templates continue to compile and can opt into editor
+  language support with project-relative globs.
+- The RustRover LSP adapter requires a commercial IntelliJ-based product;
+  RustRover is the supported product for this release.
+- Windows ARM64 remains unsupported until its native server can be built and
+  exercised in CI.
+- Marketplace publication and signing are separate release operations.
 
 ## Installation
 
-Use version 0.2.0 of the Rust crate:
+Use version 0.3.0 of the Rust crate:
 
 ```toml
 [dependencies]
-rusty-handlebars = "0.2.0"
+rusty-handlebars = "0.3.0"
 ```
 
 For VS Code, install the platform-specific `rusty-handlebars` VSIX attached to
-the release. Marketplace publication remains a separately authorized release
-step.
+the release.
+
+For RustRover, install the universal plugin ZIP through
+**Settings → Plugins → Install Plugin from Disk** and restart the IDE if
+requested.

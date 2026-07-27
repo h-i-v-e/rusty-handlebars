@@ -14,3 +14,12 @@ editors/vscode/node_modules/
 editors/vscode/dist/
 editors/vscode/server/
 editors/vscode/*.vsix
+
+# JetBrains extension build, IDE sandbox, and packaging output
+editors/jetbrains/.gradle/
+editors/jetbrains/.intellijPlatform/
+editors/jetbrains/.kotlin/
+editors/jetbrains/build/
+editors/jetbrains/out/
+editors/jetbrains/.idea/
+editors/jetbrains/*.zip

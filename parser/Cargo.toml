@@ -1,6 +1,6 @@
 [package]
 name = "rusty-handlebars-parser"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Rust source generator for rusty-handlebars templates"
 authors.workspace = true

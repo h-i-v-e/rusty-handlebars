@@ -1,0 +1,85 @@
+<idea-plugin url="https://github.com/h-i-v-e/rusty-handlebars">
+    <id>dev.hive.rusty-handlebars</id>
+    <name>Rusty Handlebars</name>
+    <vendor email="nosnhoj.emorej@gmail.com"
+            url="https://github.com/h-i-v-e/rusty-handlebars">h-i-v-e</vendor>
+
+    <description><![CDATA[
+        <p>Template authoring support for Rusty Handlebars, a compile-time
+        Rust template language.</p>
+        <p>Provides a dedicated <code>.rhbs</code> file type, mixed template
+        highlighting, Live Templates, and local language-server features
+        including diagnostics, completion, navigation, and generated Rust.</p>
+        <p>Source, documentation, and issue tracking are available on
+        <a href="https://github.com/h-i-v-e/rusty-handlebars">GitHub</a>.
+        The plugin is distributed under the
+        <a href="https://github.com/h-i-v-e/rusty-handlebars/blob/main/LICENSE.txt">MIT
+        License</a>.</p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <p>Initial RustRover release with <code>.rhbs</code> editing and
+        Rusty Handlebars language-server integration.</p>
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.ultimate</depends>
+    <depends>com.intellij.modules.lsp</depends>
+    <depends>com.intellij.modules.xml</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileType name="Rusty Handlebars"
+                  language="RustyHandlebars"
+                  implementationClass="dev.hive.rustyhandlebars.RustyHandlebarsFileType"
+                  fieldName="INSTANCE"
+                  extensions="rhbs"/>
+        <fileType.fileViewProviderFactory filetype="Rusty Handlebars"
+                                          implementationClass="dev.hive.rustyhandlebars.editor.RustyHandlebarsFileViewProviderFactory"/>
+        <lang.parserDefinition language="RustyHandlebars"
+                               implementationClass="dev.hive.rustyhandlebars.editor.RustyHandlebarsParserDefinition"/>
+        <lang.syntaxHighlighterFactory language="RustyHandlebars"
+                                       implementationClass="dev.hive.rustyhandlebars.editor.RustyHandlebarsSyntaxHighlighterFactory"/>
+        <lang.braceMatcher language="RustyHandlebars"
+                           implementationClass="dev.hive.rustyhandlebars.editor.RustyHandlebarsBraceMatcher"/>
+        <lang.commenter language="RustyHandlebars"
+                        implementationClass="dev.hive.rustyhandlebars.editor.RustyHandlebarsCommenter"/>
+        <lang.quoteHandler language="RustyHandlebars"
+                           implementationClass="dev.hive.rustyhandlebars.editor.RustyHandlebarsQuoteHandler"/>
+        <defaultLiveTemplates file="/liveTemplates/RustyHandlebars.xml"/>
+        <liveTemplateContext contextId="RUSTY_HANDLEBARS"
+                             implementation="dev.hive.rustyhandlebars.editor.RustyHandlebarsLiveTemplateContext"/>
+
+        <projectService serviceImplementation="dev.hive.rustyhandlebars.settings.RustyHandlebarsSettings"/>
+        <projectConfigurable id="dev.hive.rusty-handlebars.settings"
+                             displayName="Rusty Handlebars"
+                             instance="dev.hive.rustyhandlebars.settings.RustyHandlebarsConfigurable"/>
+
+        <platform.lsp.serverSupportProvider
+                implementation="dev.hive.rustyhandlebars.lsp.RustyHandlebarsLspSupportProvider"/>
+        <postStartupActivity implementation="dev.hive.rustyhandlebars.lsp.ProjectIndexWatcher"/>
+        <notificationGroup id="Rusty Handlebars"
+                           displayType="BALLOON"
+                           isLogByDefault="true"/>
+    </extensions>
+
+    <actions>
+        <action id="dev.hive.rusty-handlebars.showGeneratedRust"
+                class="dev.hive.rustyhandlebars.actions.ShowGeneratedRustAction"
+                text="Rusty Handlebars: Show Generated Rust"
+                description="Open the Rust source generated for the current template">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action id="dev.hive.rusty-handlebars.reloadProject"
+                class="dev.hive.rustyhandlebars.actions.ReloadProjectIndexAction"
+                text="Rusty Handlebars: Reload Project Index"
+                description="Reload Rust fields and helpers from the Cargo project">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        <action id="dev.hive.rusty-handlebars.restartServer"
+                class="dev.hive.rustyhandlebars.actions.RestartLanguageServerAction"
+                text="Rusty Handlebars: Restart Language Server"
+                description="Restart the Rusty Handlebars language server">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

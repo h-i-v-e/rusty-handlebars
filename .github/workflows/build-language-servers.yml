@@ -1,0 +1,85 @@
+name: Build language servers
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            rust_target: aarch64-apple-darwin
+            server_folder: darwin-arm64
+            executable: rusty-handlebars-language-server
+          - os: macos-15-intel
+            rust_target: x86_64-apple-darwin
+            server_folder: darwin-x64
+            executable: rusty-handlebars-language-server
+          - os: ubuntu-latest
+            rust_target: x86_64-unknown-linux-musl
+            server_folder: linux-x64
+            executable: rusty-handlebars-language-server
+          - os: ubuntu-24.04-arm
+            rust_target: aarch64-unknown-linux-musl
+            server_folder: linux-arm64
+            executable: rusty-handlebars-language-server
+          - os: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            server_folder: win32-x64
+            executable: rusty-handlebars-language-server.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+      - name: Install musl tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes musl-tools
+      - name: Build language server
+        run: >-
+          cargo build --locked --release
+          -p rusty-handlebars-language-server
+          --target ${{ matrix.rust_target }}
+      - name: Smoke-test language server
+        run: >-
+          ./target/${{ matrix.rust_target }}/release/${{ matrix.executable }}
+          --version
+      - name: Stage executable and checksum
+        shell: python {0}
+        env:
+          EXECUTABLE: target/${{ matrix.rust_target }}/release/${{ matrix.executable }}
+          SERVER_FOLDER: ${{ matrix.server_folder }}
+          EXECUTABLE_NAME: ${{ matrix.executable }}
+        run: |
+          import hashlib
+          import os
+          import pathlib
+          import shutil
+
+          source = pathlib.Path(os.environ["EXECUTABLE"])
+          destination = (
+              pathlib.Path("artifacts")
+              / "server"
+              / os.environ["SERVER_FOLDER"]
+          )
+          destination.mkdir(parents=True, exist_ok=True)
+          executable = destination / os.environ["EXECUTABLE_NAME"]
+          shutil.copy2(source, executable)
+          checksum = hashlib.sha256(executable.read_bytes()).hexdigest()
+          executable.with_name(executable.name + ".sha256").write_text(
+              f"{checksum}  {executable.name}\n",
+              encoding="utf-8",
+          )
+          (destination / "build-info.txt").write_text(
+              "target=${{ matrix.rust_target }}\n"
+              "commit=${{ github.sha }}\n",
+              encoding="utf-8",
+          )
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rusty-handlebars-server-${{ matrix.server_folder }}
+          path: artifacts/
+          if-no-files-found: error

@@ -81,7 +81,10 @@ async function startClient(
     documentSelector: documentSelector(),
     outputChannel: output,
     synchronize: {
-      configurationSection: "rustyHandlebars"
+      configurationSection: "rustyHandlebars",
+      fileEvents: vscode.workspace.createFileSystemWatcher(
+        "**/{Cargo.toml,Cargo.lock,*.rs}"
+      )
     }
   };
   client = new LanguageClient(

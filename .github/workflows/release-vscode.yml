@@ -7,49 +7,42 @@ on:
       - "vscode-v*"
 
 jobs:
+  build-language-servers:
+    uses: ./.github/workflows/build-language-servers.yml
+
   package:
+    needs: build-language-servers
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
-            rust_target: aarch64-apple-darwin
-            vscode_target: darwin-arm64
+          - vscode_target: darwin-arm64
             server_folder: darwin-arm64
             executable: rusty-handlebars-language-server
-          - os: macos-13
-            rust_target: x86_64-apple-darwin
-            vscode_target: darwin-x64
+          - vscode_target: darwin-x64
             server_folder: darwin-x64
             executable: rusty-handlebars-language-server
-          - os: ubuntu-latest
-            rust_target: x86_64-unknown-linux-gnu
-            vscode_target: linux-x64
+          - vscode_target: linux-x64
             server_folder: linux-x64
             executable: rusty-handlebars-language-server
-          - os: ubuntu-24.04-arm
-            rust_target: aarch64-unknown-linux-gnu
-            vscode_target: linux-arm64
+          - vscode_target: linux-arm64
             server_folder: linux-arm64
             executable: rusty-handlebars-language-server
-          - os: windows-latest
-            rust_target: x86_64-pc-windows-msvc
-            vscode_target: win32-x64
+          - vscode_target: win32-x64
             server_folder: win32-x64
             executable: rusty-handlebars-language-server.exe
-    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/download-artifact@v4
         with:
-          targets: ${{ matrix.rust_target }}
+          name: rusty-handlebars-server-${{ matrix.server_folder }}
+          path: native
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: editors/vscode/package-lock.json
-      - name: Build language server
-        run: cargo build --release -p rusty-handlebars-language-server --target ${{ matrix.rust_target }}
       - name: Install extension dependencies
         working-directory: editors/vscode
         run: npm ci
@@ -58,11 +51,18 @@ jobs:
         run: npm run check && npm run compile
       - name: Stage server
         working-directory: editors/vscode
-        run: node scripts/stage-server.mjs "../../target/${{ matrix.rust_target }}/release/${{ matrix.executable }}" "${{ matrix.server_folder }}"
+        run: >-
+          node scripts/stage-server.mjs
+          "../../native/server/${{ matrix.server_folder }}/${{ matrix.executable }}"
+          "${{ matrix.server_folder }}"
       - name: Package platform VSIX
         working-directory: editors/vscode
-        run: npx vsce package --no-dependencies --target ${{ matrix.vscode_target }} --out "rusty-handlebars-${{ matrix.vscode_target }}.vsix"
+        run: >-
+          npx vsce package --no-dependencies
+          --target ${{ matrix.vscode_target }}
+          --out "rusty-handlebars-${{ matrix.vscode_target }}.vsix"
       - uses: actions/upload-artifact@v4
         with:
           name: rusty-handlebars-${{ matrix.vscode_target }}
           path: editors/vscode/rusty-handlebars-${{ matrix.vscode_target }}.vsix
+          if-no-files-found: error

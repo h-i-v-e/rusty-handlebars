@@ -36,7 +36,7 @@ Handlebars implementations in other languages.
 
 ```toml
 [dependencies]
-rusty-handlebars = "0.2.0"
+rusty-handlebars = "0.3.0"
 ```
 
 Add `#[derive(WithRustyHandlebars)]` to a struct and provide a template path:
@@ -209,6 +209,17 @@ to `rustyHandlebars.legacyFileGlobs`.
 
 See [`VSCODE_EXTENSION_PLAN.md`](VSCODE_EXTENSION_PLAN.md) for the design,
 implementation phases, known semantic limits, and release strategy.
+
+The RustRover plugin in [`editors/jetbrains`](editors/jetbrains) provides the
+same shared language intelligence together with a native `.rhbs` editor,
+mixed HTML/template highlighting, Live Templates, project settings, safe
+bundled-server extraction, generated Rust inspection, and language-service
+restart/reload actions.
+
+RustRover releases are assembled as one universal plugin ZIP containing
+servers for macOS ARM64/x64, Linux ARM64/x64, and Windows x64. See the
+[RustRover installation and development guide](editors/jetbrains/README.md)
+and [`RUSTROVER_PLUGIN_PLAN.md`](RUSTROVER_PLUGIN_PLAN.md).
 
 ## License
 

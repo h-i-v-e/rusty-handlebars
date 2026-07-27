@@ -30,6 +30,10 @@ impl Documents {
     pub fn get(&self, uri: &Uri) -> Option<&Document> {
         self.open.get(uri)
     }
+
+    pub fn uris(&self) -> impl Iterator<Item = &Uri> {
+        self.open.keys()
+    }
 }
 
 pub fn byte_to_position(source: &str, byte_offset: usize) -> Position {

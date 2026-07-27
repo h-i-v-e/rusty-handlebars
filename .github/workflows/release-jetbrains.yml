@@ -1,0 +1,96 @@
+name: Package RustRover plugin
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "jetbrains-v*"
+
+jobs:
+  build-language-servers:
+    uses: ./.github/workflows/build-language-servers.yml
+
+  package:
+    needs: build-language-servers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rusty-handlebars-server-*
+          path: editors/jetbrains/src/main/resources
+          merge-multiple: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - name: Test and build plugin
+        working-directory: editors/jetbrains
+        run: ./gradlew test buildPlugin
+      - name: Inspect universal archive
+        shell: python {0}
+        working-directory: editors/jetbrains
+        run: |
+          import pathlib
+          import zipfile
+
+          archives = list(pathlib.Path("build/distributions").glob("*.zip"))
+          if len(archives) != 1:
+              raise SystemExit(f"expected one plugin ZIP, found {archives}")
+          with zipfile.ZipFile(archives[0]) as archive:
+              names = archive.namelist()
+          required = [
+              "server/darwin-arm64/rusty-handlebars-language-server",
+              "server/darwin-x64/rusty-handlebars-language-server",
+              "server/linux-arm64/rusty-handlebars-language-server",
+              "server/linux-x64/rusty-handlebars-language-server",
+              "server/win32-x64/rusty-handlebars-language-server.exe",
+          ]
+          for suffix in required:
+              matches = [name for name in names if name.endswith(suffix)]
+              if len(matches) != 1:
+                  raise SystemExit(
+                      f"expected exactly one {suffix}, found {matches}"
+                  )
+          forbidden = (
+              "/target/",
+              "/.gradle/",
+              "/.intellijPlatform/",
+              "/.idea/",
+          )
+          unexpected = [
+              name for name in names if any(item in name for item in forbidden)
+          ]
+          if unexpected:
+              raise SystemExit(f"unexpected generated files: {unexpected}")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rusty-handlebars-rustrover
+          path: editors/jetbrains/build/distributions/*.zip
+          if-no-files-found: error
+
+  verify:
+    needs:
+      - build-language-servers
+      - package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rusty-handlebars-server-*
+          path: editors/jetbrains/src/main/resources
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: rusty-handlebars-rustrover
+          path: editors/jetbrains/build/distributions
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - name: Run Plugin Verifier
+        working-directory: editors/jetbrains
+        run: ./gradlew verifyPlugin

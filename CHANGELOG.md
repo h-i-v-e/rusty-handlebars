@@ -2,6 +2,18 @@
 
 Changes made before version 0.2.0 are recorded in the Git history.
 
+## 0.3.0 - Unreleased
+
+### Added
+
+- A RustRover 2025.3.1 plugin with a dedicated `.rhbs` file type, mixed HTML
+  and template highlighting, Live Templates, settings, local LSP integration,
+  generated Rust inspection, and language-service controls.
+- Shared native language-server build artifacts and universal RustRover plugin
+  packaging for macOS ARM64/x64, Linux ARM64/x64, and Windows x64.
+- Standards-compliant file URI conversion, project-index reload support, and
+  an initialize/shutdown language-server smoke test.
+
 ## 0.2.0 - 2026-07-27
 
 ### Added
