@@ -29,6 +29,10 @@ jobs:
             rust_target: x86_64-pc-windows-msvc
             server_folder: win32-x64
             executable: rusty-handlebars-language-server.exe
+          - os: windows-11-arm
+            rust_target: aarch64-pc-windows-msvc
+            server_folder: win32-arm64
+            executable: rusty-handlebars-language-server.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

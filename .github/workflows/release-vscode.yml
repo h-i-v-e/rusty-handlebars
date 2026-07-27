@@ -32,6 +32,9 @@ jobs:
           - vscode_target: win32-x64
             server_folder: win32-x64
             executable: rusty-handlebars-language-server.exe
+          - vscode_target: win32-arm64
+            server_folder: win32-arm64
+            executable: rusty-handlebars-language-server.exe
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -61,6 +64,27 @@ jobs:
           npx vsce package --no-dependencies
           --target ${{ matrix.vscode_target }}
           --out "rusty-handlebars-${{ matrix.vscode_target }}.vsix"
+      - name: Inspect platform VSIX
+        working-directory: editors/vscode
+        shell: python {0}
+        env:
+          VSIX_PATH: rusty-handlebars-${{ matrix.vscode_target }}.vsix
+          SERVER_PATH: server/${{ matrix.server_folder }}/${{ matrix.executable }}
+        run: |
+          import os
+          import zipfile
+
+          expected = f"extension/{os.environ['SERVER_PATH']}"
+          with zipfile.ZipFile(os.environ["VSIX_PATH"]) as archive:
+              server_files = [
+                  name
+                  for name in archive.namelist()
+                  if name.startswith("extension/server/") and not name.endswith("/")
+              ]
+          if server_files != [expected]:
+              raise SystemExit(
+                  f"expected only {expected} in the VSIX, found {server_files}"
+              )
       - uses: actions/upload-artifact@v4
         with:
           name: rusty-handlebars-${{ matrix.vscode_target }}

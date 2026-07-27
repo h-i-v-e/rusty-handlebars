@@ -1,11 +1,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const executable = process.platform === "win32"
+const target = process.argv[3] ?? `${process.platform}-${process.arch}`;
+const executable = target.startsWith("win32-")
   ? "rusty-handlebars-language-server.exe"
   : "rusty-handlebars-language-server";
 const source = process.argv[2] ?? path.resolve("..", "..", "target", "debug", executable);
-const target = process.argv[3] ?? `${process.platform}-${process.arch}`;
 const destinationDirectory = path.resolve("server", target);
 const destination = path.join(destinationDirectory, executable);
 

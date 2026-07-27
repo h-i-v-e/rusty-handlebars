@@ -5,6 +5,7 @@
   "version": "0.3.0",
   "publisher": "rusty-handlebars",
   "license": "MIT",
+  "icon": "./icons/marketplace-icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/h-i-v-e/rusty-handlebars.git"

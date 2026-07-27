@@ -29,7 +29,7 @@ The first shippable implementation was added on 2026-07-27:
   helper completion, known-invalid diagnostics, field type hover, and field
   definitions.
 - Phase 5 has CI quality gates and a platform-specific release matrix for
-  macOS ARM64/x64, Linux ARM64/x64, and Windows x64.
+  macOS ARM64/x64, Linux ARM64/x64, and Windows ARM64/x64.
 
 The intentionally deferred formatter, live preview, complete Rust name
 resolution, and browser-hosted extension remain deferred. Marketplace
@@ -592,7 +592,7 @@ Build and package native server binaries for at least:
 - Linux x64;
 - Linux ARM64;
 - Windows x64;
-- Windows ARM64 if CI and dependencies support it reliably.
+- Windows ARM64.
 
 Publish platform-specific VSIX packages so users do not need a Rust toolchain.
 The extension should choose the server bundled for its platform and
