@@ -25,12 +25,14 @@ mod compiler;
 mod error;
 mod expression;
 mod expression_tokenizer;
+mod syntax;
 
 pub use block::*;
 pub use compiler::*;
 pub use error::*;
 pub use expression::*;
 pub use expression_tokenizer::*;
+pub use syntax::*;
 
 #[cfg(test)]
 mod tests {

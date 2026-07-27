@@ -133,7 +133,7 @@ impl Block for IfSome {
         rust.code.push_str("}else{");
         Ok(())
     }
-    fn local<'a>(&self) -> &Local {
+    fn local(&self) -> &Local {
         &self.local
     }
 }
@@ -202,7 +202,7 @@ impl With {
 }
 
 impl Block for With {
-    fn local<'a>(&self) -> &Local {
+    fn local(&self) -> &Local {
         &self.local
     }
 }
@@ -327,7 +327,7 @@ impl Each {
         append_with_depth(self.depth, "_index", &mut rust.code);
     }
 
-    fn write_map_var<'a>(&self, depth: usize, suffix: &str, rust: &mut Rust) {
+    fn write_map_var(&self, depth: usize, suffix: &str, rust: &mut Rust) {
         append_with_depth(
             depth,
             if let Local::As(name) = &self.local {
@@ -372,7 +372,7 @@ impl Block for Each {
         name: &str,
         rust: &mut Rust,
     ) -> Result<()> {
-        Ok(match name {
+        match name {
             "index" if !self.has_else.get() => self.write_indexer(rust),
             "index" => Err(ParseError::new(
                 "@index is not available in an each else branch",
@@ -384,17 +384,18 @@ impl Block for Each {
                 &format!("unexpected variable {}", name),
                 expression,
             ))?,
-        })
+        }
+        Ok(())
     }
 
-    fn handle_close<'a>(&self, rust: &mut Rust) {
+    fn handle_close(&self, rust: &mut Rust) {
         rust.code.push('}');
         if self.has_else.get() {
             rust.code.push('}');
         }
     }
 
-    fn local<'a>(&self) -> &Local {
+    fn local(&self) -> &Local {
         &self.local
     }
 }

@@ -1,0 +1,119 @@
+{
+  "name": "rusty-handlebars",
+  "displayName": "Rusty Handlebars",
+  "description": "Template authoring support for compile-time Rusty Handlebars templates.",
+  "version": "0.1.0",
+  "publisher": "rusty-handlebars",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/h-i-v-e/rusty-handlebars.git"
+  },
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Snippets"
+  ],
+  "keywords": [
+    "rust",
+    "handlebars",
+    "template",
+    "rhbs"
+  ],
+  "activationEvents": [
+    "onLanguage:rusty-handlebars",
+    "onCommand:rustyHandlebars.showGeneratedRust",
+    "workspaceContains:**/*.rhbs",
+    "workspaceContains:**/*.hbs"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "rusty-handlebars",
+        "aliases": [
+          "Rusty Handlebars",
+          "rusty-handlebars"
+        ],
+        "extensions": [
+          ".rhbs"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "rusty-handlebars",
+        "scopeName": "text.html.rusty-handlebars",
+        "path": "./syntaxes/rusty-handlebars.tmLanguage.json",
+        "embeddedLanguages": {
+          "text.html.basic": "html"
+        }
+      }
+    ],
+    "snippets": [
+      {
+        "language": "rusty-handlebars",
+        "path": "./snippets/rusty-handlebars.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "rustyHandlebars.showGeneratedRust",
+        "title": "Rusty Handlebars: Show Generated Rust"
+      },
+      {
+        "command": "rustyHandlebars.restartServer",
+        "title": "Rusty Handlebars: Restart Language Server"
+      }
+    ],
+    "configuration": {
+      "title": "Rusty Handlebars",
+      "properties": {
+        "rustyHandlebars.server.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Optional path to a language-server binary. The bundled binary is used by default."
+        },
+        "rustyHandlebars.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Trace communication between VS Code and the language server."
+        },
+        "rustyHandlebars.legacyFileGlobs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional template globs, such as **/templates/*.hbs. These files are associated only when this setting is explicit."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "compile": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "build-server": "cargo build -p rusty-handlebars-language-server",
+    "stage-server": "node scripts/stage-server.mjs",
+    "package": "npm run check && npm run compile && npm run build-server && npm run stage-server && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "1.125.0",
+    "@vscode/vsce": "3.9.2",
+    "esbuild": "0.28.1",
+    "typescript": "7.0.2",
+    "vscode-languageclient": "10.1.0"
+  }
+}

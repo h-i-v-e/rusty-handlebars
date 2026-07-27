@@ -45,7 +45,7 @@ Add `#[derive(WithRustyHandlebars)]` to a struct and provide a template path:
 use rusty_handlebars::WithRustyHandlebars;
 
 #[derive(WithRustyHandlebars)]
-#[template(path = "templates/email.hbs")]
+#[template(path = "templates/email.rhbs")]
 struct Email<'a> {
     recipient: &'a str,
     items: &'a [&'a str],
@@ -56,6 +56,10 @@ Paths are resolved from the Cargo workspace root when the deriving package is
 a workspace member. Otherwise they are resolved from that package's manifest
 directory. The template is read by the procedural macro and must exist when
 the package is compiled.
+
+`.rhbs` is the preferred extension for new Rusty Handlebars templates. It
+distinguishes this Rust-oriented language from standard Handlebars tooling.
+Existing `.hbs` paths remain fully supported by the compiler.
 
 The derive implements:
 
@@ -190,6 +194,21 @@ feature.
 
 See [`examples`](examples) for templates covering nested data, options,
 lookups, maps, formatting, and template composition.
+
+## Editor support
+
+The VS Code extension in [`editors/vscode`](editors/vscode) registers `.rhbs`
+as the `rusty-handlebars` language and includes highlighting, snippets,
+diagnostics, completion, hover information, symbols, folding, matching blocks,
+Cargo context discovery, field definitions, and a **Show Generated Rust**
+command.
+
+The extension does not claim `.hbs` globally. For a legacy template, select
+the Rusty Handlebars language mode manually or add a workspace-specific glob
+to `rustyHandlebars.legacyFileGlobs`.
+
+See [`VSCODE_EXTENSION_PLAN.md`](VSCODE_EXTENSION_PLAN.md) for the design,
+implementation phases, known semantic limits, and release strategy.
 
 ## License
 

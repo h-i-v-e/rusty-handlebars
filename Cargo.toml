@@ -2,7 +2,8 @@
 members = [
   "derive",
   "parser",
-  "examples"
+  "examples",
+  "language-server"
 ]
 
 [workspace.package]

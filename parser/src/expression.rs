@@ -89,12 +89,10 @@ impl<'a> Expression<'a> {
         loop {
             let candidate = postfix
                 .find("{{{{/")
-                .ok_or(ParseError::unclosed(&open.raw))?;
+                .ok_or(ParseError::unclosed(open.raw))?;
             let start = candidate + 5;
             let remains = &postfix[start..];
-            let close = remains
-                .find("}}}}")
-                .ok_or(ParseError::unclosed(&open.raw))?;
+            let close = remains.find("}}}}").ok_or(ParseError::unclosed(open.raw))?;
             let end = start + close + 4;
             if &remains[..close] == open.content {
                 return Ok(Self {
@@ -184,8 +182,7 @@ impl<'a> Expression<'a> {
         }
         let start = self.prefix.len();
         let end = start + self.content.len() + 16;
-        return &self.raw
-            [min(len - 1, if start > 16 { start - 16 } else { 0 })..min(self.raw.len(), end)];
+        &self.raw[min(len - 1, start.saturating_sub(16))..min(self.raw.len(), end)]
     }
 }
 

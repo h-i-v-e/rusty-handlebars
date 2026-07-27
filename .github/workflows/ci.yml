@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt -p rusty-handlebars-parser -p rusty-handlebars-language-server -- --check
+      - name: Test workspace
+        run: cargo test --workspace --all-features
+      - name: Lint workspace
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  vscode:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm run compile
+      - name: Validate declarative files
+        run: |
+          node -e 'for (const file of ["package.json", "language-configuration.json", "syntaxes/rusty-handlebars.tmLanguage.json", "snippets/rusty-handlebars.json"]) JSON.parse(require("node:fs").readFileSync(file, "utf8"))'

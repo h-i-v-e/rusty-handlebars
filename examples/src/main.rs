@@ -134,7 +134,7 @@ fn main(){
                 address: Some("1234 Main St".to_string())
             }
         }
-    }.to_string());
+    });
     println!("{}", ChecklistEmail{
         asset_title: "Asset 1234",
         address: "1234 Main St",
@@ -153,7 +153,7 @@ fn main(){
             responses: vec![true, false, true]
         },
         link: "https://example.com"
-    }.to_string());
+    });
     println!("{}", Wrapper{
         wrapped: &[
             Holder{
@@ -187,5 +187,5 @@ fn main(){
                 }
             }
         ]
-    }.to_string());
+    });
 }

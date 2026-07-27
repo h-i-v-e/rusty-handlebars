@@ -4,6 +4,7 @@ use crate::{
     error::{ParseError, Result},
     expression::{Expression, ExpressionType},
     expression_tokenizer::{Token, TokenType},
+    parse_template, BlockNode, Node, NodeKind, Span,
 };
 
 /// Binding introduced by a block helper.
@@ -62,8 +63,8 @@ impl Rust {
 /// Compiles the behavior of an open block.
 pub trait Block {
     /// Writes code that closes this block.
-    fn handle_close<'a>(&self, rust: &mut Rust) {
-        rust.code.push_str("}");
+    fn handle_close(&self, rust: &mut Rust) {
+        rust.code.push('}');
     }
 
     /// Resolves a block variable such as `@index`.
@@ -86,12 +87,12 @@ pub trait Block {
     }
 
     /// Returns the field path used as this block's context, if inherited.
-    fn this<'a>(&self) -> Option<&str> {
+    fn this(&self) -> Option<&str> {
         None
     }
 
     /// Returns the binding introduced by this block.
-    fn local<'a>(&self) -> &Local {
+    fn local(&self) -> &Local {
         &Local::None
     }
 }
@@ -132,7 +133,7 @@ struct Root<'a> {
 }
 
 impl<'a> Block for Root<'a> {
-    fn this<'b>(&self) -> Option<&str> {
+    fn this(&self) -> Option<&str> {
         self.this
     }
 }
@@ -169,7 +170,7 @@ impl<'a> Compile<'a> {
                 }
             }
         }
-        return Ok((local, scope));
+        Ok((local, scope))
     }
 
     fn resolve_local(
@@ -192,7 +193,7 @@ impl<'a> Compile<'a> {
             }
             return true;
         }
-        return false;
+        false
     }
 
     fn resolve_var(&self, var: &'a str, scope: &Scope, buffer: &mut String) -> Result<()> {
@@ -294,7 +295,7 @@ impl<'a> Compile<'a> {
             rust,
             &args
                 .next()?
-                .ok_or(ParseError::new("lookup expects 2 arguments", &expression))?,
+                .ok_or(ParseError::new("lookup expects 2 arguments", expression))?,
         )?;
         rust.code.push(postfix);
         Ok(())
@@ -333,9 +334,9 @@ impl<'a> Compile<'a> {
     }
 
     fn resolve(&self, expression: &Expression<'a>, rust: &mut Rust) -> Result<()> {
-        let token = match Token::first(&expression.content)? {
+        let token = match Token::first(expression.content)? {
             Some(token) => token,
-            None => return Err(ParseError::new("expected token", &expression)),
+            None => return Err(ParseError::new("expected token", expression)),
         };
         rust.code.push_str(expression.prefix);
         if let TokenType::SubExpression(raw) = token.token_type {
@@ -366,11 +367,12 @@ impl<'a> Compile<'a> {
             .open_stack
             .pop()
             .ok_or_else(|| ParseError::new("Mismatched block helper", &expression))?;
-        Ok(scope.opened.handle_close(rust))
+        scope.opened.handle_close(rust);
+        Ok(())
     }
 
     fn open(&mut self, expression: Expression<'a>, rust: &mut Rust) -> Result<()> {
-        let token = Token::first(&expression.content)?
+        let token = Token::first(expression.content)?
             .ok_or_else(|| ParseError::new("expected token", &expression))?;
         match self.block_map.get(token.value) {
             Some(block) => {
@@ -499,7 +501,7 @@ impl Compiler {
         expression: &Expression<'a>,
         display: DisplayKind,
     ) -> Result<PendingWrite<'a>> {
-        if let Some(token) = Token::first(&expression.content)? {
+        if let Some(token) = Token::first(expression.content)? {
             if let TokenType::Variable = token.token_type {
                 if token.value != "format" {
                     return Ok(PendingWrite::Expression((*expression, display)));
@@ -530,11 +532,139 @@ impl Compiler {
         Ok(PendingWrite::Expression((*expression, display)))
     }
 
+    fn expression<'a>(
+        source: &'a str,
+        expression_type: ExpressionType,
+        expression_span: Span,
+        raw_span: Span,
+    ) -> Expression<'a> {
+        Expression {
+            expression_type,
+            prefix: "",
+            content: &source[expression_span.start..expression_span.end],
+            postfix: "",
+            raw: &source[raw_span.start..raw_span.end],
+        }
+    }
+
+    fn text_content(source: &str, span: Span) -> &str {
+        let mut content = &source[span.start..span.end];
+        let before = &source[..span.start];
+        if before.ends_with("~}}") || before.ends_with("~}}}") || before.ends_with("~}}}}") {
+            content = content.trim_start();
+        }
+        let after = &source[span.end..];
+        if after.starts_with("{{~") || after.starts_with("{{{~") || after.starts_with("{{{{~") {
+            content = content.trim_end();
+        }
+        content
+    }
+
+    fn compile_block<'a>(
+        &self,
+        source: &'a str,
+        block: &BlockNode<'a>,
+        pending: &mut Vec<PendingWrite<'a>>,
+        compile: &mut Compile<'a>,
+        rust: &mut Rust,
+    ) -> Result<()> {
+        self.commit_pending(pending, compile, rust)?;
+        compile.open(
+            Self::expression(
+                source,
+                ExpressionType::Open,
+                block.expression_span,
+                block.open_span,
+            ),
+            rust,
+        )?;
+        self.compile_nodes(source, &block.body, pending, compile, rust)?;
+        if let Some(else_span) = block.else_span {
+            self.commit_pending(pending, compile, rust)?;
+            compile.handle_else(
+                &Self::expression(
+                    source,
+                    ExpressionType::HtmlEscaped,
+                    Span::new(else_span.start + 2, else_span.end - 2),
+                    else_span,
+                ),
+                rust,
+            )?;
+            self.compile_nodes(source, &block.else_body, pending, compile, rust)?;
+        }
+        self.commit_pending(pending, compile, rust)?;
+        let close_span = block.close_span.expect("validated block must have a close");
+        compile.close(
+            Self::expression(source, ExpressionType::Close, close_span, close_span),
+            rust,
+        )
+    }
+
+    fn compile_nodes<'a>(
+        &self,
+        source: &'a str,
+        nodes: &[Node<'a>],
+        pending: &mut Vec<PendingWrite<'a>>,
+        compile: &mut Compile<'a>,
+        rust: &mut Rust,
+    ) -> Result<()> {
+        for node in nodes {
+            match &node.kind {
+                NodeKind::Text(_) => {
+                    let content = Self::text_content(source, node.span);
+                    if !content.is_empty() {
+                        pending.push(PendingWrite::Raw(content));
+                    }
+                }
+                NodeKind::Comment { .. } => {}
+                NodeKind::Interpolation {
+                    escaped,
+                    expression_span,
+                    ..
+                } => {
+                    let expression = Self::expression(
+                        source,
+                        if *escaped {
+                            ExpressionType::HtmlEscaped
+                        } else {
+                            ExpressionType::Raw
+                        },
+                        *expression_span,
+                        node.span,
+                    );
+                    pending.push(Self::select_write(
+                        &expression,
+                        if *escaped {
+                            DisplayKind::HtmlEscaped
+                        } else {
+                            DisplayKind::Raw
+                        },
+                    )?);
+                }
+                NodeKind::Block(block) => {
+                    self.compile_block(source, block, pending, compile, rust)?;
+                }
+                NodeKind::RawBlock { content_span, .. } => {
+                    let content = Self::text_content(source, *content_span);
+                    if !content.is_empty() {
+                        pending.push(PendingWrite::Raw(content));
+                    }
+                }
+                NodeKind::Error(_) => unreachable!("diagnostics are rejected before compilation"),
+            }
+        }
+        Ok(())
+    }
+
     /// Compiles `src` into Rust statements.
     ///
     /// The returned source expects the configured root and writer names to be
     /// valid in the context where the statements are inserted.
     pub fn compile(&self, src: &str) -> Result<Rust> {
+        let parsed = parse_template(src);
+        if let Some(diagnostic) = parsed.diagnostics.first() {
+            return Err(ParseError::from_diagnostic(diagnostic));
+        }
         let mut compile = Compile::new(
             self.options.root_var_name,
             &self.block_map,
@@ -544,46 +674,7 @@ impl Compiler {
             code: String::with_capacity(src.len().saturating_mul(2)),
         };
         let mut pending: Vec<PendingWrite> = Vec::with_capacity(16);
-        let mut rest = src;
-        let mut expression = Expression::from(src)?;
-        while let Some(expr) = expression {
-            let Expression {
-                expression_type,
-                prefix,
-                content,
-                postfix,
-                raw: _,
-            } = &expr;
-            rest = postfix;
-            if !prefix.is_empty() {
-                pending.push(PendingWrite::Raw(prefix));
-            }
-            match expression_type {
-                ExpressionType::Raw => pending.push(Self::select_write(&expr, DisplayKind::Raw)?),
-                ExpressionType::HtmlEscaped => {
-                    if *content == "else" {
-                        self.commit_pending(&mut pending, &mut compile, &mut rust)?;
-                        compile.handle_else(&expr, &mut rust)?
-                    } else {
-                        pending.push(Self::select_write(&expr, DisplayKind::HtmlEscaped)?)
-                    }
-                }
-                ExpressionType::Open => {
-                    self.commit_pending(&mut pending, &mut compile, &mut rust)?;
-                    compile.open(expr, &mut rust)?
-                }
-                ExpressionType::Close => {
-                    self.commit_pending(&mut pending, &mut compile, &mut rust)?;
-                    compile.close(expr, &mut rust)?
-                }
-                ExpressionType::Escaped => pending.push(PendingWrite::Raw(content)),
-                _ => (),
-            };
-            expression = expr.next()?;
-        }
-        if !rest.is_empty() {
-            pending.push(PendingWrite::Raw(rest));
-        }
+        self.compile_nodes(src, &parsed.nodes, &mut pending, &mut compile, &mut rust)?;
         self.commit_pending(&mut pending, &mut compile, &mut rust)?;
         Ok(rust)
     }

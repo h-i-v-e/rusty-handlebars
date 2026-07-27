@@ -237,14 +237,11 @@ mod tests {
 
     #[test]
     fn test_with_rusty_handlebars() {
-        assert!(
-            TestTemplate {
-                message: &["Hello", "World!"],
-            }
-            .to_string()
-            .len()
-                != 0
-        )
+        assert!(!TestTemplate {
+            message: &["Hello", "World!"],
+        }
+        .to_string()
+        .is_empty())
     }
 
     #[test]

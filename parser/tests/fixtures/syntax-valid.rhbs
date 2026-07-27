@@ -1,0 +1,18 @@
+Hello {{name}}!
+{{!-- comment --}}
+{{#if ready}}
+  {{{raw_html}}}
+{{else}}
+  {{format "{:.2}" amount}}
+{{/if}}
+{{#if_some_ref optional as |value|}}{{value}}{{/if_some_ref}}
+{{#with_ref nested as nested_value}}{{nested_value.name}}{{/with_ref}}
+{{#each_ref values as |value|}}
+  {{@index}} {{@key}} {{@value}} {{value}} {{../name}}
+{{else}}
+  empty
+{{/each_ref}}
+{{lookup values 0}}
+{{try_lookup values 0}}
+\{{literal}}
+{{{{raw}}}}{{not_parsed}}{{{{/raw}}}}

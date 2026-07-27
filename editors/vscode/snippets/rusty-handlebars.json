@@ -1,0 +1,82 @@
+{
+  "Escaped interpolation": {
+    "prefix": "rh-value",
+    "body": "{{${1:value}}}",
+    "description": "HTML-escaped interpolation"
+  },
+  "Raw interpolation": {
+    "prefix": "rh-raw",
+    "body": "{{{${1:value}}}}",
+    "description": "Unescaped interpolation"
+  },
+  "If else": {
+    "prefix": "rh-if",
+    "body": [
+      "{{#if ${1:value}}}",
+      "\t$2",
+      "{{else}}",
+      "\t$3",
+      "{{/if}}"
+    ]
+  },
+  "Unless": {
+    "prefix": "rh-unless",
+    "body": [
+      "{{#unless ${1:value}}}",
+      "\t$2",
+      "{{/unless}}"
+    ]
+  },
+  "Borrow optional": {
+    "prefix": "rh-if-some",
+    "body": [
+      "{{#if_some_ref ${1:value} as |${2:item}|}}",
+      "\t$3",
+      "{{else}}",
+      "\t$4",
+      "{{/if_some_ref}}"
+    ]
+  },
+  "Borrow context": {
+    "prefix": "rh-with",
+    "body": [
+      "{{#with_ref ${1:value} as |${2:item}|}}",
+      "\t$3",
+      "{{/with_ref}}"
+    ]
+  },
+  "Borrow iteration": {
+    "prefix": "rh-each",
+    "body": [
+      "{{#each_ref ${1:values} as |${2:item}|}}",
+      "\t$3",
+      "{{else}}",
+      "\t$4",
+      "{{/each_ref}}"
+    ]
+  },
+  "Lookup": {
+    "prefix": "rh-lookup",
+    "body": "{{lookup ${1:values} ${2:index}}}"
+  },
+  "Try lookup": {
+    "prefix": "rh-try-lookup",
+    "body": "{{try_lookup ${1:map} ${2:key}}}"
+  },
+  "Format": {
+    "prefix": "rh-format",
+    "body": "{{format \"{:${1:.2}}\" ${2:value}}}"
+  },
+  "Comment": {
+    "prefix": "rh-comment",
+    "body": "{{!-- ${1:comment} --}}"
+  },
+  "Raw block": {
+    "prefix": "rh-raw-block",
+    "body": [
+      "{{{{${1:raw}}}}}",
+      "$2",
+      "{{{{/${1:raw}}}}}"
+    ]
+  }
+}

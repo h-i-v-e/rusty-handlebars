@@ -1,4 +1,4 @@
-use crate::expression::Expression;
+use crate::{expression::Expression, Diagnostic};
 use std::{error::Error, fmt::Display};
 
 /// A template parsing or source-generation error.
@@ -7,7 +7,7 @@ pub struct ParseError {
     pub(crate) message: String,
 }
 
-pub(crate) fn rcap<'a>(src: &'a str) -> &'a str {
+pub(crate) fn rcap(src: &str) -> &str {
     static CAP_AT: usize = 32;
 
     if src.len() > CAP_AT {
@@ -27,6 +27,15 @@ impl ParseError {
     pub(crate) fn unclosed(preffix: &str) -> Self {
         Self {
             message: format!("unclosed block near {}", rcap(preffix)),
+        }
+    }
+
+    pub(crate) fn from_diagnostic(diagnostic: &Diagnostic) -> Self {
+        Self {
+            message: format!(
+                "{} [{}] at bytes {}..{}",
+                diagnostic.message, diagnostic.code, diagnostic.span.start, diagnostic.span.end
+            ),
         }
     }
 }

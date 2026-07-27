@@ -48,11 +48,7 @@ fn find_end_of_string(src: &str) -> Result<usize> {
     for (i, c) in cliped.char_indices() {
         match c {
             '\\' => escaped = !escaped,
-            '"' => {
-                if !escaped {
-                    return Ok(i + 2);
-                }
-            }
+            '"' if !escaped => return Ok(i + 2),
             _ => (),
         }
     }
@@ -74,11 +70,10 @@ fn invalid_variable_name(src: &str) -> bool {
     if src.starts_with("../") {
         return false;
     }
-    return src
-        .chars()
+    src.chars()
         .next()
         .map(|c| !(c.is_alphabetic() || c == '_'))
-        .unwrap_or(false);
+        .unwrap_or(false)
 }
 
 fn parse<'a>(src: &'a str) -> Result<Option<Token<'a>>> {
@@ -88,15 +83,15 @@ fn parse<'a>(src: &'a str) -> Result<Option<Token<'a>>> {
             Some(Token {
                 token_type: TokenType::PrivateVariable,
                 value: &src[1..end],
-                tail: &src[end..].trim_start(),
+                tail: src[end..].trim_start(),
             })
         }
         Some('(') => {
-            let end = find_closing(&src)?;
+            let end = find_closing(src)?;
             Some(Token {
                 token_type: TokenType::SubExpression(&src[..end]),
                 value: &src[1..end],
-                tail: &src[end + 1..].trim_start(),
+                tail: src[end + 1..].trim_start(),
             })
         }
         None => None,
@@ -116,7 +111,7 @@ fn parse<'a>(src: &'a str) -> Result<Option<Token<'a>>> {
             Some(Token {
                 token_type,
                 value: &src[..end],
-                tail: &src[end..].trim_start(),
+                tail: src[end..].trim_start(),
             })
         }
     })

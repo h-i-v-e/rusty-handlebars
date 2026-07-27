@@ -1,0 +1,167 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Rusty Handlebars",
+  "scopeName": "text.html.rusty-handlebars",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#raw-blocks"
+    },
+    {
+      "include": "#triple-expression"
+    },
+    {
+      "include": "#expression"
+    },
+    {
+      "include": "text.html.basic"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.rusty-handlebars",
+          "begin": "\\{\\{~?!--",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.begin.rusty-handlebars"
+            }
+          },
+          "end": "--~?\\}\\}",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.end.rusty-handlebars"
+            }
+          }
+        },
+        {
+          "name": "comment.line.rusty-handlebars",
+          "match": "\\{\\{~?![^}]*~?\\}\\}"
+        }
+      ]
+    },
+    "raw-blocks": {
+      "patterns": [
+        {
+          "name": "string.unquoted.raw.rusty-handlebars",
+          "begin": "\\{\\{\\{\\{~?([A-Za-z_][A-Za-z0-9_]*)~?\\}\\}\\}\\}",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.section.block.begin.rusty-handlebars"
+            },
+            "1": {
+              "name": "entity.name.function.rusty-handlebars"
+            }
+          },
+          "end": "\\{\\{\\{\\{~?/\\1~?\\}\\}\\}\\}",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.block.end.rusty-handlebars"
+            }
+          }
+        }
+      ]
+    },
+    "triple-expression": {
+      "patterns": [
+        {
+          "name": "meta.expression.raw.rusty-handlebars",
+          "begin": "(\\{\\{\\{~?)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.section.embedded.begin.rusty-handlebars"
+            }
+          },
+          "end": "(~?\\}\\}\\})",
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.section.embedded.end.rusty-handlebars"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#expression-content"
+            }
+          ]
+        }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        {
+          "name": "meta.expression.rusty-handlebars",
+          "begin": "(\\{\\{~?)([#/]?)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.section.embedded.begin.rusty-handlebars"
+            },
+            "2": {
+              "name": "keyword.control.rusty-handlebars"
+            }
+          },
+          "end": "(~?\\}\\})",
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.section.embedded.end.rusty-handlebars"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#expression-content"
+            }
+          ]
+        }
+      ]
+    },
+    "expression-content": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.rusty-handlebars",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.rusty-handlebars",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "entity.name.function.block.rusty-handlebars",
+          "match": "\\b(?:if|unless|if_some|if_some_ref|with|with_ref|each|each_ref)\\b"
+        },
+        {
+          "name": "support.function.rusty-handlebars",
+          "match": "\\b(?:lookup|try_lookup|format)\\b"
+        },
+        {
+          "name": "variable.language.rusty-handlebars",
+          "match": "@(?:index|key|value)\\b"
+        },
+        {
+          "name": "keyword.operator.parent.rusty-handlebars",
+          "match": "\\.\\./"
+        },
+        {
+          "name": "keyword.control.alias.rusty-handlebars",
+          "match": "\\b(?:as|else)\\b"
+        },
+        {
+          "name": "constant.numeric.rusty-handlebars",
+          "match": "\\b(?:\\d+(?:\\.\\d+)?|true|false)\\b"
+        },
+        {
+          "name": "punctuation.definition.alias.rusty-handlebars",
+          "match": "[|()]"
+        },
+        {
+          "name": "variable.other.rusty-handlebars",
+          "match": "[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*"
+        }
+      ]
+    }
+  }
+}
