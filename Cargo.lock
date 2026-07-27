@@ -1431,7 +1431,7 @@ checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
 
 [[package]]
 name = "rusty-handlebars"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "rusty-handlebars-derive",
  "rusty-handlebars-parser",
@@ -1439,7 +1439,7 @@ dependencies = [
 
 [[package]]
 name = "rusty-handlebars-derive"
-version = "0.1.4"
+version = "0.2.0"
 dependencies = [
  "minify-html",
  "proc-macro2",
@@ -1451,7 +1451,7 @@ dependencies = [
 
 [[package]]
 name = "rusty-handlebars-examples"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "rusty-handlebars",
  "serde_json",
@@ -1459,7 +1459,7 @@ dependencies = [
 
 [[package]]
 name = "rusty-handlebars-language-server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cargo_metadata",
  "lsp-server",
@@ -1473,7 +1473,7 @@ dependencies = [
 
 [[package]]
 name = "rusty-handlebars-parser"
-version = "0.1.4"
+version = "0.2.0"
 dependencies = [
  "minify-html",
 ]

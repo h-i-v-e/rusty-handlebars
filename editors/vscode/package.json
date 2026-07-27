@@ -2,7 +2,7 @@
   "name": "rusty-handlebars",
   "displayName": "Rusty Handlebars",
   "description": "Template authoring support for compile-time Rusty Handlebars templates.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "rusty-handlebars",
   "license": "MIT",
   "repository": {
@@ -41,7 +41,11 @@
         "extensions": [
           ".rhbs"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/rusty-handlebars-light.svg",
+          "dark": "./icons/rusty-handlebars-dark.svg"
+        }
       }
     ],
     "grammars": [
@@ -105,8 +109,10 @@
     "compile": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "build-server": "cargo build -p rusty-handlebars-language-server",
+    "build-server:linux": "node scripts/cross-linux.mjs",
     "stage-server": "node scripts/stage-server.mjs",
-    "package": "npm run check && npm run compile && npm run build-server && npm run stage-server && vsce package --no-dependencies"
+    "package": "npm run check && npm run compile && npm run build-server && npm run stage-server && vsce package --no-dependencies",
+    "package:linux": "node scripts/cross-linux.mjs all --package"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

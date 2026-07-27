@@ -8,6 +8,9 @@ templates.
 `.rhbs` files activate the extension automatically. The compiler still accepts
 `.hbs`; associate legacy files explicitly with the `rusty-handlebars` language
 or add project-specific patterns to `rustyHandlebars.legacyFileGlobs`.
+A rusty side-profile bicycle icon distinguishes `.rhbs` files in the Explorer
+and editor tabs when the active file-icon theme uses language icons. Separate
+light and dark variants preserve its contrast.
 
 The extension runs a native language server locally. Template text and Cargo
 workspace metadata are not sent to a remote service. Project indexing reads
@@ -31,3 +34,47 @@ npm run compile
 
 Set `rustyHandlebars.server.path` to the development server binary, or copy it
 under `server/<platform>-<architecture>/`.
+
+## Cross-compiling Linux packages
+
+Linux x64 and ARM64 language servers can be built from macOS or Linux with
+[`cross`](https://github.com/cross-rs/cross). Docker 20.10 or newer (or Podman
+3.4 or newer) must be installed and running.
+
+Install `cross` once:
+
+```sh
+cargo install cross --git https://github.com/cross-rs/cross --locked
+```
+
+Then, from `editors/vscode`, build both Linux servers:
+
+```sh
+npm run build-server:linux
+```
+
+Build only one architecture by passing `x64` or `arm64`:
+
+```sh
+npm run build-server:linux -- x64
+npm run build-server:linux -- arm64
+```
+
+The binaries are written below:
+
+```text
+target/cross/<rust-target>/<rust-target>/release/
+```
+
+To build both servers and package a separate platform-specific VSIX for each:
+
+```sh
+npm run package:linux
+```
+
+This creates:
+
+```text
+rusty-handlebars-<version>-linux-x64.vsix
+rusty-handlebars-<version>-linux-arm64.vsix
+```

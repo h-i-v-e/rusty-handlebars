@@ -36,7 +36,7 @@ Handlebars implementations in other languages.
 
 ```toml
 [dependencies]
-rusty-handlebars = "0.1.3"
+rusty-handlebars = "0.2.0"
 ```
 
 Add `#[derive(WithRustyHandlebars)]` to a struct and provide a template path:
