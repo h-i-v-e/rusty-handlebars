@@ -83,6 +83,11 @@ rusty-handlebars-<version>-linux-arm64.vsix
 
 The GitHub release workflow also creates `rusty-handlebars-universal.vsix`.
 It contains language servers for macOS ARM64/x64, Linux ARM64/x64, and Windows
-ARM64/x64. Upload this target-neutral package through the Marketplace web
-portal when publishing the platform-specific packages with `vsce` is not
-available. The extension selects the matching bundled server at runtime.
+ARM64/x64. The extension selects the matching bundled server at runtime.
+
+Pushing a `vscode-v*` tag creates a GitHub Release and attaches the universal
+VSIX together with all six platform-specific packages. Download the universal
+VSIX from the repository's Releases page and upload it through the Marketplace
+web portal when publishing the platform-specific packages with `vsce` is not
+available. Manually dispatched workflow runs keep the packages as workflow
+artifacts and do not create a GitHub Release.

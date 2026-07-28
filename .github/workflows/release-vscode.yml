@@ -167,3 +167,78 @@ jobs:
           name: rusty-handlebars-universal
           path: editors/vscode/rusty-handlebars-universal.vsix
           if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/vscode-v')
+    needs:
+      - package
+      - package-universal
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: rusty-handlebars-darwin-arm64
+          path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: rusty-handlebars-darwin-x64
+          path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: rusty-handlebars-linux-arm64
+          path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: rusty-handlebars-linux-x64
+          path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: rusty-handlebars-win32-arm64
+          path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: rusty-handlebars-win32-x64
+          path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: rusty-handlebars-universal
+          path: release
+      - name: Verify release assets
+        shell: bash
+        run: |
+          expected=(
+            rusty-handlebars-darwin-arm64.vsix
+            rusty-handlebars-darwin-x64.vsix
+            rusty-handlebars-linux-arm64.vsix
+            rusty-handlebars-linux-x64.vsix
+            rusty-handlebars-win32-arm64.vsix
+            rusty-handlebars-win32-x64.vsix
+            rusty-handlebars-universal.vsix
+          )
+          for asset in "${expected[@]}"; do
+            test -f "release/${asset}" || {
+              echo "::error::Missing release asset: ${asset}"
+              exit 1
+            }
+          done
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          assets=(release/*.vsix)
+          version="${GITHUB_REF_NAME#vscode-v}"
+          if gh release view "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "${assets[@]}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" "${assets[@]}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --verify-tag \
+              --title "Rusty Handlebars VS Code ${version}" \
+              --generate-notes
+          fi
