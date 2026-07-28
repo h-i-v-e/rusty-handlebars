@@ -11,7 +11,7 @@ expressions. Rendering does not parse a template or build a dynamic context:
 use rusty_handlebars::WithRustyHandlebars;
 
 #[derive(WithRustyHandlebars)]
-#[template(path = "examples/templates/more-involved.hbs")]
+#[template(path = "examples/templates/more-involved.rhbs")]
 struct Profile<'a> {
     name: &'a str,
     age: u8,
@@ -156,7 +156,7 @@ The `helpers` attribute maps helper names in a template to Rust function paths:
 ```rust
 #[derive(rusty_handlebars::WithRustyHandlebars)]
 #[template(
-    path = "templates/report.hbs",
+    path = "templates/report.rhbs",
     helpers = ["crate::helpers::format_date"]
 )]
 struct Report {
@@ -177,7 +177,7 @@ is minified unless its attribute sets `minify = false`:
 
 ```rust
 #[derive(rusty_handlebars::WithRustyHandlebars)]
-#[template(path = "templates/plain-text.hbs", minify = false)]
+#[template(path = "templates/plain-text.rhbs", minify = false)]
 struct PlainTextEmail<'a> {
     body: &'a str,
 }

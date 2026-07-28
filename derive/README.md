@@ -13,7 +13,7 @@ Rust, and implements `Display`, `rusty_handlebars::WithRustyHandlebars`, and
 use rusty_handlebars::WithRustyHandlebars;
 
 #[derive(WithRustyHandlebars)]
-#[template(path = "templates/email.hbs")]
+#[template(path = "templates/email.rhbs")]
 struct Email<'a> {
     recipient: &'a str,
 }

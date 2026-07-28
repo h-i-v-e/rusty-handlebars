@@ -259,7 +259,7 @@ mod tests {
     #[test]
     fn parses_and_qualifies_helpers() {
         let args: TemplateArgs = syn::parse_str(
-            r#"path = "template.hbs", helpers = ["format_date", "crate::capitalize"]"#,
+            r#"path = "template.rhbs", helpers = ["format_date", "crate::capitalize"]"#,
         )
         .unwrap();
         let paths = helper_paths(args.helpers);

@@ -9,7 +9,7 @@
 //! use rusty_handlebars::WithRustyHandlebars;
 //!
 //! #[derive(WithRustyHandlebars)]
-//! #[template(path = "examples/templates/more-involved.hbs")]
+//! #[template(path = "examples/templates/more-involved.rhbs")]
 //! struct Profile<'a> {
 //!     name: &'a str,
 //!     age: u8,
@@ -214,13 +214,13 @@ mod tests {
     use super::*;
 
     #[derive(WithRustyHandlebars)]
-    #[template(path = "examples/templates/hello-world.hbs")]
+    #[template(path = "examples/templates/hello-world.rhbs")]
     struct TestTemplate<'a> {
         message: &'a [&'a str],
     }
 
     #[derive(WithRustyHandlebars)]
-    #[template(path = "examples/templates/generic.hbs", minify = false)]
+    #[template(path = "examples/templates/generic.rhbs", minify = false)]
     struct GenericTemplate<'a, T, const N: usize>
     where
         T: AsDisplayHtml,
@@ -230,7 +230,7 @@ mod tests {
     }
 
     #[derive(WithRustyHandlebars)]
-    #[template(path = "examples/templates/each-else.hbs", minify = false)]
+    #[template(path = "examples/templates/each-else.rhbs", minify = false)]
     struct EachElseTemplate<'a> {
         values: Vec<&'a str>,
     }

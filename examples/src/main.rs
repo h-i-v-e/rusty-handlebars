@@ -19,7 +19,7 @@ struct ChecklistResponseSave{
 }
 
 #[derive(WithRustyHandlebars)]
-#[template(path="examples/templates/email.hbs")]
+#[template(path="examples/templates/email.rhbs")]
 struct ChecklistEmail<'a, 'b, 'c>{
     asset_title: &'a str,
     address: &'a str,
@@ -30,11 +30,11 @@ struct ChecklistEmail<'a, 'b, 'c>{
 }
 
 #[derive(WithRustyHandlebars)]
-#[template(path="examples/templates/very-simple.hbs")]
+#[template(path="examples/templates/very-simple.rhbs")]
 struct Simple{}
 
 #[derive(WithRustyHandlebars)]
-#[template(path="examples/templates/more-involved.hbs")]
+#[template(path="examples/templates/more-involved.rhbs")]
 struct MoreInvolved<'a>{
     name: &'a str,
     age: u8
@@ -42,13 +42,13 @@ struct MoreInvolved<'a>{
 
 
 #[derive(WithRustyHandlebars)]
-#[template(path="examples/templates/with-options.hbs")]
+#[template(path="examples/templates/with-options.rhbs")]
 struct WithOptions<'a>{
     options: &'a [Option<&'a str>]
 }
 
 #[derive(WithRustyHandlebars)]
-#[template(path="examples/templates/lookups.hbs")]
+#[template(path="examples/templates/lookups.rhbs")]
 struct Lookups<'a>{
     names: &'a [&'a str],
     is_planet: &'a [bool]
@@ -65,7 +65,7 @@ impl<'a> AsDisplay for &Holder<'a>{
 }
 
 #[derive(WithRustyHandlebars)]
-#[template(path="examples/templates/wrapper.hbs")]
+#[template(path="examples/templates/wrapper.rhbs")]
 struct Wrapper<'a>{
     wrapped: &'a [Holder<'a>]
 }
@@ -102,7 +102,7 @@ struct FormData {
 }
 
 #[derive(WithRustyHandlebars)]
-#[template(path="examples/templates/map.hbs")]
+#[template(path="examples/templates/map.rhbs")]
 struct FormTemplateData<'a> {
     properties: &'a FormProperties,
     data: &'a FormData,

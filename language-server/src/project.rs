@@ -285,7 +285,7 @@ mod tests {
             .parent()
             .expect("language-server is a workspace member");
         let index = ProjectIndex::discover(root).unwrap();
-        let contexts = index.contexts_for(&root.join("examples/templates/hello-world.hbs"));
+        let contexts = index.contexts_for(&root.join("examples/templates/hello-world.rhbs"));
         assert!(
             contexts.iter().any(|context| {
                 context.name == "TestTemplate"
