@@ -23,3 +23,5 @@ editors/jetbrains/build/
 editors/jetbrains/out/
 editors/jetbrains/.idea/
 editors/jetbrains/*.zip
+
+.DS_Store
