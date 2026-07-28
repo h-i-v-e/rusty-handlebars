@@ -90,3 +90,80 @@ jobs:
           name: rusty-handlebars-${{ matrix.vscode_target }}
           path: editors/vscode/rusty-handlebars-${{ matrix.vscode_target }}.vsix
           if-no-files-found: error
+
+  package-universal:
+    needs: build-language-servers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rusty-handlebars-server-*
+          path: native
+          merge-multiple: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - name: Install extension dependencies
+        working-directory: editors/vscode
+        run: npm ci
+      - name: Build extension
+        working-directory: editors/vscode
+        run: npm run check && npm run compile
+      - name: Stage all servers
+        working-directory: editors/vscode
+        run: |
+          node scripts/stage-server.mjs \
+            "../../native/server/darwin-arm64/rusty-handlebars-language-server" \
+            "darwin-arm64"
+          node scripts/stage-server.mjs \
+            "../../native/server/darwin-x64/rusty-handlebars-language-server" \
+            "darwin-x64"
+          node scripts/stage-server.mjs \
+            "../../native/server/linux-arm64/rusty-handlebars-language-server" \
+            "linux-arm64"
+          node scripts/stage-server.mjs \
+            "../../native/server/linux-x64/rusty-handlebars-language-server" \
+            "linux-x64"
+          node scripts/stage-server.mjs \
+            "../../native/server/win32-arm64/rusty-handlebars-language-server.exe" \
+            "win32-arm64"
+          node scripts/stage-server.mjs \
+            "../../native/server/win32-x64/rusty-handlebars-language-server.exe" \
+            "win32-x64"
+      - name: Package universal VSIX
+        working-directory: editors/vscode
+        run: >-
+          npx vsce package --no-dependencies
+          --out "rusty-handlebars-universal.vsix"
+      - name: Inspect universal VSIX
+        working-directory: editors/vscode
+        shell: python {0}
+        run: |
+          import zipfile
+
+          expected = sorted([
+              "extension/server/darwin-arm64/rusty-handlebars-language-server",
+              "extension/server/darwin-x64/rusty-handlebars-language-server",
+              "extension/server/linux-arm64/rusty-handlebars-language-server",
+              "extension/server/linux-x64/rusty-handlebars-language-server",
+              "extension/server/win32-arm64/rusty-handlebars-language-server.exe",
+              "extension/server/win32-x64/rusty-handlebars-language-server.exe",
+          ])
+          with zipfile.ZipFile("rusty-handlebars-universal.vsix") as archive:
+              server_files = sorted([
+                  name
+                  for name in archive.namelist()
+                  if name.startswith("extension/server/") and not name.endswith("/")
+              ])
+          if server_files != expected:
+              raise SystemExit(
+                  f"expected {expected} in the VSIX, found {server_files}"
+              )
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rusty-handlebars-universal
+          path: editors/vscode/rusty-handlebars-universal.vsix
+          if-no-files-found: error

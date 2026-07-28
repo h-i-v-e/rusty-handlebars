@@ -595,15 +595,16 @@ Build and package native server binaries for at least:
 - Windows ARM64.
 
 Publish platform-specific VSIX packages so users do not need a Rust toolchain.
-The extension should choose the server bundled for its platform and
-architecture.
+Also build a target-neutral universal VSIX containing every server for manual
+Marketplace uploads that cannot accept multiple packages. The extension should
+choose the server bundled for its platform and architecture.
 
 CI should:
 
 1. run Rust formatting, clippy, and tests;
 2. run TypeScript linting, compilation, and tests;
 3. build each supported server target;
-4. package platform-specific VSIX files;
+4. package platform-specific VSIX files and a universal fallback;
 5. smoke-test that each package contains the expected executable;
 6. attach VSIX artifacts to tagged releases;
 7. publish to the VS Code Marketplace only from an explicitly authorized

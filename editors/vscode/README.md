@@ -78,3 +78,11 @@ This creates:
 rusty-handlebars-<version>-linux-x64.vsix
 rusty-handlebars-<version>-linux-arm64.vsix
 ```
+
+## Universal Marketplace package
+
+The GitHub release workflow also creates `rusty-handlebars-universal.vsix`.
+It contains language servers for macOS ARM64/x64, Linux ARM64/x64, and Windows
+ARM64/x64. Upload this target-neutral package through the Marketplace web
+portal when publishing the platform-specific packages with `vsce` is not
+available. The extension selects the matching bundled server at runtime.
