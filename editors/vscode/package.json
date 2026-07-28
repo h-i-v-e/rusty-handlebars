@@ -1,8 +1,8 @@
 {
-  "name": "rusty-handlebars",
-  "displayName": "Rusty Handlebars",
+  "name": "rusty-handlebars-rhbs",
+  "displayName": "Rusty Handlebars for RHBS",
   "description": "Template authoring support for compile-time Rusty Handlebars templates.",
-  "version": "0.3.1",
+  "version": "0.3.3",
   "publisher": "rusty-handlebars",
   "license": "MIT",
   "icon": "./icons/marketplace-icon.png",

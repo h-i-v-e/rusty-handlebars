@@ -5,6 +5,10 @@ hover information, symbols, folding, selection ranges, matching-block
 highlights, signature help, and generated Rust inspection for Rusty Handlebars
 templates.
 
+The Marketplace extension ID is
+`rusty-handlebars.rusty-handlebars-rhbs`. The package name is deliberately
+distinct from the language ID, which remains `rusty-handlebars`.
+
 `.rhbs` files activate the extension automatically. The compiler still accepts
 `.hbs`; associate legacy files explicitly with the `rusty-handlebars` language
 or add project-specific patterns to `rustyHandlebars.legacyFileGlobs`.
